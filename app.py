@@ -948,11 +948,12 @@ if st.session_state.data_loaded:
             
             # Run Monte Carlo simulation (30 days forward for futures)
             with st.spinner("Running Monte Carlo simulation..."):
-                mc_prices = PredictiveModels.monte_carlo_simulation(
-                    current_price,
-                    sigma,
-                    30,  # 30 days forward
-                    num_simulations
+                mc_prices = OptionsPricing.monte_carlo_price_paths(
+                    S=current_price,
+                    r=risk_free_rate,
+                    sigma=sigma,
+                    days=30,  # 30 days forward
+                    num_simulations=int(num_simulations)
                 )
             
             # Plot Monte Carlo paths
@@ -1018,30 +1019,80 @@ if st.session_state.data_loaded:
             st.markdown('<div class="section-header">🤖 Machine Learning Predictions</div>', unsafe_allow_html=True)
             
             with st.spinner("Training predictive models..."):
-                ml_predictions = PredictiveModels.predict_future_price(
-                    historical_data,
-                    days_ahead=30
+                # Target 30 days ahead for futures
+                target_days = 30
+                
+                # Decision Tree
+                dt_model, dt_stats, dt_error = PredictiveModels.train_decision_tree(
+                    historical_data, target_days
+                )
+                
+                # SVM
+                svm_model, svm_scaler, svm_stats, svm_error = PredictiveModels.train_svm_rbf(
+                    historical_data, target_days
                 )
             
-            if ml_predictions:
-                col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown("#### 🌲 Decision Tree")
+                if dt_model and dt_stats:
+                    df_features = PredictiveModels.prepare_features(historical_data)
+                    if not df_features.empty:
+                        feature_cols = [col for col in df_features.columns if col != 'Close']
+                        X_latest = df_features[feature_cols].iloc[-1:].values
+                        dt_prediction = dt_model.predict(X_latest)[0]
+                        dt_change = ((dt_prediction - current_price) / current_price) * 100
+                        
+                        st.metric("Predicted Price", f"${dt_prediction:.2f}", f"{dt_change:+.2f}%")
+                        st.metric("Train R²", f"{dt_stats['train_score']:.4f}")
+                        st.metric("Test R²", f"{dt_stats['test_score']:.4f}")
+                    else:
+                        dt_prediction = current_price
+                        st.warning("Unable to make prediction")
+                else:
+                    dt_prediction = current_price
+                    st.error(f"Training failed: {dt_error}")
+            
+            with col2:
+                st.markdown("#### 🎯 SVM (RBF)")
+                if svm_model and svm_stats:
+                    df_features = PredictiveModels.prepare_features(historical_data)
+                    if not df_features.empty:
+                        feature_cols = [col for col in df_features.columns if col != 'Close']
+                        X_latest = df_features[feature_cols].iloc[-1:].values
+                        X_latest_scaled = svm_scaler.transform(X_latest)
+                        svm_prediction = svm_model.predict(X_latest_scaled)[0]
+                        svm_change = ((svm_prediction - current_price) / current_price) * 100
+                        
+                        st.metric("Predicted Price", f"${svm_prediction:.2f}", f"{svm_change:+.2f}%")
+                        st.metric("Train R²", f"{svm_stats['train_score']:.4f}")
+                        st.metric("Test R²", f"{svm_stats['test_score']:.4f}")
+                    else:
+                        svm_prediction = current_price
+                        st.warning("Unable to make prediction")
+                else:
+                    svm_prediction = current_price
+                    st.error(f"Training failed: {svm_error}")
+            
+            with col3:
+                st.markdown("#### 📊 Consensus")
+                avg_pred = (dt_prediction + svm_prediction) / 2
+                avg_change = ((avg_pred - current_price) / current_price) * 100
                 
-                with col1:
-                    dt_pred = ml_predictions.get('decision_tree', current_price)
-                    dt_change = ((dt_pred - current_price) / current_price) * 100
-                    st.metric("Decision Tree", f"${dt_pred:.2f}", f"{dt_change:+.2f}%")
-                
-                with col2:
-                    svm_pred = ml_predictions.get('svm', current_price)
-                    svm_change = ((svm_pred - current_price) / current_price) * 100
-                    st.metric("SVM (RBF)", f"${svm_pred:.2f}", f"{svm_change:+.2f}%")
-                
-                with col3:
-                    avg_pred = (dt_pred + svm_pred) / 2
-                    avg_change = ((avg_pred - current_price) / current_price) * 100
-                    st.metric("Average", f"${avg_pred:.2f}", f"{avg_change:+.2f}%")
-                
-                st.info(f"**Consensus:** {'🐂 Bullish' if avg_change > 0 else '🐻 Bearish'} - Models predict {avg_change:+.2f}% move")
+                st.metric("Average Price", f"${avg_pred:.2f}", f"{avg_change:+.2f}%")
+                if avg_change > 0:
+                    st.success("🐂 **Bullish**")
+                else:
+                    st.error("🐻 **Bearish**")
+                st.caption(f"Models predict {abs(avg_change):.2f}% move")
+            
+            # Build ML predictions dict
+            ml_predictions = {}
+            if dt_model and dt_stats:
+                ml_predictions['decision_tree'] = dt_prediction
+            if svm_model and svm_stats:
+                ml_predictions['svm'] = svm_prediction
             
             # ================================================================
             # FUTURES AI RECOMMENDATIONS

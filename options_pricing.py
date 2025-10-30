@@ -111,6 +111,29 @@ class OptionsPricing:
         return ST
     
     @staticmethod
+    def monte_carlo_price_paths(S, r, sigma, days, num_simulations=10000):
+        """
+        Monte Carlo simulation generating full price paths over time
+        S: Current price
+        r: Risk-free rate (annualized)
+        sigma: Volatility (annualized)
+        days: Number of days to simulate
+        num_simulations: Number of simulation paths
+        Returns: Array of shape (num_simulations, days) with price paths
+        """
+        dt = 1 / 252  # Daily time step (trading days)
+        paths = np.zeros((num_simulations, days))
+        paths[:, 0] = S
+        
+        for t in range(1, days):
+            z = np.random.standard_normal(num_simulations)
+            paths[:, t] = paths[:, t-1] * np.exp(
+                (r - 0.5 * sigma ** 2) * dt + sigma * np.sqrt(dt) * z
+            )
+        
+        return paths
+    
+    @staticmethod
     def calculate_greeks(S, K, T, r, sigma, option_type='call'):
         """Calculate option Greeks"""
         if T <= 0:
