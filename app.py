@@ -565,6 +565,26 @@ if st.session_state.data_loaded:
             
             st.plotly_chart(fig_hist, use_container_width=True)
             
+            # Chart Legend/Key
+            with st.expander("📊 Chart Legend - Monte Carlo Simulation"):
+                st.markdown("""
+                **Price Distribution Histogram:**
+                - **Blue Bars**: Frequency of simulated final prices
+                - **Red Dashed Line**: Current stock price
+                - **Green Dashed Line**: Mean (average) simulated price
+                
+                **How to Read:**
+                - Taller bars = More likely price outcomes
+                - Wider spread = Higher uncertainty/volatility
+                - Position of mean vs. current = Expected price movement direction
+                
+                **Key Metrics:**
+                - **Mean**: Expected price based on risk-free drift
+                - **Median**: Middle value of all simulations
+                - **Percentiles**: Probability ranges (10th = 90% chance price is higher)
+                - **Probability > Current**: Likelihood of price increase
+                """)
+            
             # Machine Learning Predictions
             st.markdown("### 🤖 Machine Learning Price Predictions")
             
@@ -879,6 +899,192 @@ if st.session_state.data_loaded:
                     
                     st.dataframe(display_all, use_container_width=True)
             
+            # =================================================================
+            # SCORE EXPLANATIONS
+            # =================================================================
+            st.markdown("### 📚 Understanding AI Scores")
+            
+            st.markdown("""
+            The AI recommendation system uses two key scoring mechanisms to evaluate each trade opportunity:
+            """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### 📐 Greeks Score (0-100)")
+                st.markdown("""
+                **What It Measures:** How favorable the option's Greeks are for the recommended action.
+                
+                **Components Analyzed:**
+                - **Delta (Price Sensitivity)**
+                  - For BUY: Higher delta (>0.6) = Higher score
+                  - Low delta (<0.45) = Score penalty
+                
+                - **Gamma (Delta Change Rate)**
+                  - High gamma (>0.05) = Position management complexity
+                  - Moderate gamma (0.02-0.05) = Stable conditions
+                
+                - **Theta (Time Decay)**
+                  - For BUY: High negative theta = Score penalty
+                  - For SELL: High negative theta = Score boost
+                  - Theta < -$0.10/day is considered "high"
+                
+                - **Vega (Volatility Sensitivity)**
+                  - High vega + Low IV = Good for buyers (+10 bonus)
+                  - High vega + High IV = Good for sellers (+10 bonus)
+                
+                - **Time to Expiration**
+                  - < 7 days: Penalizes buyers, rewards sellers
+                  - > 45 days: Rewards buyers, penalizes sellers
+                
+                **Score Ranges:**
+                - **80-100**: Excellent Greek profile for this action
+                - **60-79**: Good Greek profile
+                - **40-59**: Neutral/Mixed Greek profile
+                - **20-39**: Poor Greek profile
+                - **0-19**: Very unfavorable Greeks
+                
+                **Impact on Recommendation:**
+                - Greeks Score multiplies the risk-adjusted return
+                - Confidence adjusts: ±0.10 can upgrade/downgrade confidence level
+                - Example: Score of 70 → 70% of base risk-adjusted return
+                """)
+                
+                with st.expander("🔍 Greeks Score Calculation Example"):
+                    st.code("""
+Base Score: 50 (neutral)
+
+BUY CALL Analysis:
++ Strong Delta (0.65):        +15 points
++ High Gamma (0.06):          +10 points
+- High Theta (-$0.12/day):    -15 points
++ High Vega (0.18):           +10 points
++ Low Current IV (22%):       +5 points (Vega bonus)
+- Short Time (5 days):        -10 points
+
+Final Greeks Score: 55/100
+Confidence Adjustment: -0.10 (HIGH → MEDIUM)
+Risk-Adj Return Multiplier: 0.55
+                    """, language="text")
+            
+            with col2:
+                st.markdown("#### 🤖 SVM Model Score (0-100)")
+                st.markdown("""
+                **What It Measures:** How well the machine learning prediction aligns with the recommended action.
+                
+                **SVM Model Details:**
+                - **Algorithm**: Support Vector Machine with RBF kernel
+                - **Training**: Historical price data (1 year)
+                - **Features**: 20+ technical indicators (MA, RSI, momentum, volume)
+                - **Prediction**: Price N days ahead (matches expiration)
+                
+                **Scoring Logic:**
+                
+                **For BUY CALL Actions:**
+                - Predicted move > +5%: +30 points, +0.15 confidence
+                - Predicted move > +2%: +15 points, +0.08 confidence
+                - Predicted move < -2%: -20 points, -0.15 confidence
+                
+                **For BUY PUT Actions:**
+                - Predicted move < -5%: +30 points, +0.15 confidence
+                - Predicted move < -2%: +15 points, +0.08 confidence
+                - Predicted move > +2%: -20 points, -0.15 confidence
+                
+                **For SELL Actions:**
+                - Opposite logic (rewards flat/contrary predictions)
+                
+                **Strike Analysis:**
+                - If SVM predicts price > strike (for CALL): +10 bonus
+                - If SVM predicts price < strike (for PUT): +10 bonus
+                
+                **Score Ranges:**
+                - **80-100**: Strong ML confirmation
+                - **60-79**: Good ML alignment
+                - **40-59**: Neutral/Mixed ML signal
+                - **20-39**: ML suggests caution
+                - **0-19**: ML contradicts recommendation
+                
+                **Impact on Recommendation:**
+                - ML Score multiplies the risk-adjusted return (after Greeks)
+                - Confidence adjusts: ±0.10 can upgrade/downgrade confidence
+                - Example: Score of 85 → 85% of Greeks-adjusted return
+                """)
+                
+                with st.expander("🔍 SVM Score Calculation Example"):
+                    st.code("""
+Base Score: 50 (neutral)
+
+BUY CALL @ $150 Analysis:
+Current Price: $148
+SVM Prediction: $156 (+5.4%)
+
++ Bullish prediction (>5%):   +30 points
++ Price above strike:         +10 points
++ Moderate move magnitude:    +10 points
+
+Final ML Score: 80/100
+Confidence Adjustment: +0.15 (MEDIUM → HIGH)
+Risk-Adj Return Multiplier: 0.80
+
+Combined Effect:
+Base Return: 0.0500
+× Greeks (70): 0.0350
+× ML (80):     0.0280 (final)
+                    """, language="text")
+            
+            st.markdown("---")
+            
+            st.markdown("#### 🎯 Combined Scoring Impact")
+            
+            impact_col1, impact_col2, impact_col3 = st.columns(3)
+            
+            with impact_col1:
+                st.markdown("**📊 Risk-Adjusted Return**")
+                st.code("""
+Base Return
+    ↓
+× Greeks Score
+    ↓
+× ML Score
+    ↓
+Final Return
+                """, language="text")
+                st.caption("Both scores directly multiply the expected return")
+            
+            with impact_col2:
+                st.markdown("**🎚️ Confidence Level**")
+                st.code("""
+Base: HIGH/MEDIUM/LOW
+    ↓
++ Greeks Adjustment
+    ↓
++ ML Adjustment
+    ↓
+Final Confidence
+                """, language="text")
+                st.caption("Can upgrade or downgrade by one level")
+            
+            with impact_col3:
+                st.markdown("**💡 Best Recommendations**")
+                st.markdown("""
+                **Ideal Profile:**
+                - Greeks: 80+
+                - ML: 80+
+                - Both aligned
+                - High base probability
+                
+                **Result:**
+                - High confidence
+                - Top ranked
+                - Clear action signal
+                """)
+            
+            st.info("""
+            💡 **Pro Tip:** Look for recommendations where BOTH Greeks and ML scores are above 70. 
+            This indicates strong alignment between technical factors (Greeks) and predictive models (ML), 
+            providing the highest confidence trading opportunities.
+            """)
+            
             # Risk Analysis Summary
             st.markdown("### ⚠️ Risk Analysis Summary")
             
@@ -1012,6 +1218,27 @@ if st.session_state.data_loaded:
             with col4:
                 st.metric("5th Percentile", f"${np.percentile(final_prices, 5):.2f}")
                 st.metric("Downside Risk", f"${current_price - np.percentile(final_prices, 25):.2f}")
+            
+            # Chart Legend/Key
+            with st.expander("📊 Chart Legend - Monte Carlo Price Paths"):
+                st.markdown(f"""
+                **Price Path Simulation Chart:**
+                - **Light Blue Lines**: 20 random sample price paths out of {num_simulations:,} simulations
+                - **Red Bold Line**: Mean (average) path across all simulations
+                - **Green Dashed Line**: Current futures price (starting point)
+                
+                **How to Read:**
+                - Each line shows one possible price trajectory over 30 days
+                - Wider spread = Higher volatility/uncertainty
+                - Mean path = Expected price movement
+                - Convergence/divergence = Stability/instability expectations
+                
+                **Key Metrics:**
+                - **Expected Price**: Average final price across all simulations
+                - **Probability Up/Down**: Likelihood of price movement direction
+                - **Percentiles**: Range of probable outcomes (95th = only 5% chance of exceeding)
+                - **Upside/Downside**: Expected gains/losses from current price
+                """)
             
             # ================================================================
             # ML PREDICTIONS FOR FUTURES
