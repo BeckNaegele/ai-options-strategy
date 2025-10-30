@@ -194,6 +194,283 @@ if st.session_state.data_loaded:
             st.info(f"📅 Days to Expiration: {days_to_exp} | ⏰ Years: {T:.4f}")
             
             # =================================================================
+            # GREEKS SECTION
+            # =================================================================
+            st.markdown('<div class="section-header">📐 Option Greeks Analysis</div>', unsafe_allow_html=True)
+            
+            st.markdown("""
+            **The Greeks** measure the sensitivity of options prices to various factors:
+            - **Delta (Δ)**: Rate of change in option price relative to stock price change
+            - **Gamma (Γ)**: Rate of change in Delta relative to stock price change  
+            - **Theta (Θ)**: Rate of time decay (daily)
+            - **Vega (ν)**: Sensitivity to volatility changes (per 1% change)
+            - **Rho (ρ)**: Sensitivity to interest rate changes (per 1% change)
+            """)
+            
+            # Calculate Greeks for ATM and nearby strikes
+            current_price = st.session_state.current_price
+            if st.session_state.volatility:
+                sigma = st.session_state.volatility
+            else:
+                sigma = 0.3  # Default 30%
+            
+            # Select strikes within 10% of current price (ATM region)
+            strike_range = current_price * 0.10
+            atm_strikes = calls_df[
+                (calls_df['strike'] >= current_price - strike_range) &
+                (calls_df['strike'] <= current_price + strike_range)
+            ]['strike'].values
+            
+            if len(atm_strikes) > 0:
+                # Limit to 5 strikes for cleaner display
+                if len(atm_strikes) > 5:
+                    # Get closest 5 strikes to ATM
+                    distances = np.abs(atm_strikes - current_price)
+                    closest_indices = np.argsort(distances)[:5]
+                    atm_strikes = atm_strikes[closest_indices]
+                    atm_strikes = np.sort(atm_strikes)
+                
+                greeks_data = []
+                
+                for strike in atm_strikes:
+                    # Calculate Greeks for calls
+                    call_greeks = OptionsPricing.calculate_greeks(
+                        current_price, strike, T, risk_free_rate, sigma, 'call'
+                    )
+                    
+                    # Calculate Greeks for puts
+                    put_greeks = OptionsPricing.calculate_greeks(
+                        current_price, strike, T, risk_free_rate, sigma, 'put'
+                    )
+                    
+                    # Get market prices
+                    call_price = calls_df[calls_df['strike'] == strike]['lastPrice'].values[0] if len(calls_df[calls_df['strike'] == strike]) > 0 else 0
+                    put_price = puts_df[puts_df['strike'] == strike]['lastPrice'].values[0] if len(puts_df[puts_df['strike'] == strike]) > 0 else 0
+                    
+                    greeks_data.append({
+                        'Strike': strike,
+                        'Type': 'CALL',
+                        'Price': call_price,
+                        'Delta': call_greeks['delta'],
+                        'Gamma': call_greeks['gamma'],
+                        'Theta': call_greeks['theta'],
+                        'Vega': call_greeks['vega'],
+                        'Rho': call_greeks['rho']
+                    })
+                    
+                    greeks_data.append({
+                        'Strike': strike,
+                        'Type': 'PUT',
+                        'Price': put_price,
+                        'Delta': put_greeks['delta'],
+                        'Gamma': put_greeks['gamma'],
+                        'Theta': put_greeks['theta'],
+                        'Vega': put_greeks['vega'],
+                        'Rho': put_greeks['rho']
+                    })
+                
+                greeks_df = pd.DataFrame(greeks_data)
+                
+                # Display Greeks table
+                st.markdown("### 📊 Greeks by Strike Price")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("#### 📞 Call Options Greeks")
+                    calls_greeks = greeks_df[greeks_df['Type'] == 'CALL'][['Strike', 'Price', 'Delta', 'Gamma', 'Theta', 'Vega', 'Rho']]
+                    st.dataframe(
+                        calls_greeks.style.format({
+                            'Strike': '${:.2f}',
+                            'Price': '${:.2f}',
+                            'Delta': '{:.4f}',
+                            'Gamma': '{:.4f}',
+                            'Theta': '{:.4f}',
+                            'Vega': '{:.4f}',
+                            'Rho': '{:.4f}'
+                        }).background_gradient(subset=['Delta'], cmap='RdYlGn', vmin=-1, vmax=1),
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    st.markdown("#### 📉 Put Options Greeks")
+                    puts_greeks = greeks_df[greeks_df['Type'] == 'PUT'][['Strike', 'Price', 'Delta', 'Gamma', 'Theta', 'Vega', 'Rho']]
+                    st.dataframe(
+                        puts_greeks.style.format({
+                            'Strike': '${:.2f}',
+                            'Price': '${:.2f}',
+                            'Delta': '{:.4f}',
+                            'Gamma': '{:.4f}',
+                            'Theta': '{:.4f}',
+                            'Vega': '{:.4f}',
+                            'Rho': '{:.4f}'
+                        }).background_gradient(subset=['Delta'], cmap='RdYlGn_r', vmin=-1, vmax=1),
+                        use_container_width=True
+                    )
+                
+                # Greeks Visualization
+                st.markdown("### 📈 Greeks Visualization")
+                
+                tab1, tab2, tab3 = st.tabs(["Delta & Gamma", "Theta & Vega", "Rho"])
+                
+                with tab1:
+                    fig1 = go.Figure()
+                    
+                    # Delta for calls
+                    calls_greeks_df = greeks_df[greeks_df['Type'] == 'CALL']
+                    fig1.add_trace(go.Scatter(
+                        x=calls_greeks_df['Strike'],
+                        y=calls_greeks_df['Delta'],
+                        name='Call Delta',
+                        mode='lines+markers',
+                        line=dict(color='green', width=2),
+                        marker=dict(size=8)
+                    ))
+                    
+                    # Delta for puts
+                    puts_greeks_df = greeks_df[greeks_df['Type'] == 'PUT']
+                    fig1.add_trace(go.Scatter(
+                        x=puts_greeks_df['Strike'],
+                        y=puts_greeks_df['Delta'],
+                        name='Put Delta',
+                        mode='lines+markers',
+                        line=dict(color='red', width=2),
+                        marker=dict(size=8)
+                    ))
+                    
+                    # Gamma for both (overlaid)
+                    fig1.add_trace(go.Scatter(
+                        x=calls_greeks_df['Strike'],
+                        y=calls_greeks_df['Gamma'],
+                        name='Gamma',
+                        mode='lines+markers',
+                        line=dict(color='blue', width=2, dash='dash'),
+                        marker=dict(size=6),
+                        yaxis='y2'
+                    ))
+                    
+                    # Add current price line
+                    fig1.add_vline(x=current_price, line_dash="dash", line_color="gray",
+                                  annotation_text=f"Current: ${current_price:.2f}")
+                    
+                    fig1.update_layout(
+                        title='Delta and Gamma by Strike',
+                        xaxis_title='Strike Price',
+                        yaxis_title='Delta',
+                        yaxis2=dict(title='Gamma', overlaying='y', side='right'),
+                        hovermode='x unified',
+                        height=400
+                    )
+                    
+                    st.plotly_chart(fig1, use_container_width=True)
+                
+                with tab2:
+                    fig2 = go.Figure()
+                    
+                    # Theta
+                    fig2.add_trace(go.Scatter(
+                        x=calls_greeks_df['Strike'],
+                        y=calls_greeks_df['Theta'],
+                        name='Call Theta',
+                        mode='lines+markers',
+                        line=dict(color='purple', width=2)
+                    ))
+                    
+                    fig2.add_trace(go.Scatter(
+                        x=puts_greeks_df['Strike'],
+                        y=puts_greeks_df['Theta'],
+                        name='Put Theta',
+                        mode='lines+markers',
+                        line=dict(color='orange', width=2)
+                    ))
+                    
+                    # Vega (same for calls and puts)
+                    fig2.add_trace(go.Scatter(
+                        x=calls_greeks_df['Strike'],
+                        y=calls_greeks_df['Vega'],
+                        name='Vega',
+                        mode='lines+markers',
+                        line=dict(color='cyan', width=2, dash='dash'),
+                        yaxis='y2'
+                    ))
+                    
+                    fig2.add_vline(x=current_price, line_dash="dash", line_color="gray",
+                                  annotation_text=f"Current: ${current_price:.2f}")
+                    
+                    fig2.update_layout(
+                        title='Theta and Vega by Strike',
+                        xaxis_title='Strike Price',
+                        yaxis_title='Theta (Daily Decay)',
+                        yaxis2=dict(title='Vega', overlaying='y', side='right'),
+                        hovermode='x unified',
+                        height=400
+                    )
+                    
+                    st.plotly_chart(fig2, use_container_width=True)
+                
+                with tab3:
+                    fig3 = go.Figure()
+                    
+                    fig3.add_trace(go.Scatter(
+                        x=calls_greeks_df['Strike'],
+                        y=calls_greeks_df['Rho'],
+                        name='Call Rho',
+                        mode='lines+markers',
+                        line=dict(color='teal', width=2)
+                    ))
+                    
+                    fig3.add_trace(go.Scatter(
+                        x=puts_greeks_df['Strike'],
+                        y=puts_greeks_df['Rho'],
+                        name='Put Rho',
+                        mode='lines+markers',
+                        line=dict(color='brown', width=2)
+                    ))
+                    
+                    fig3.add_vline(x=current_price, line_dash="dash", line_color="gray",
+                                  annotation_text=f"Current: ${current_price:.2f}")
+                    
+                    fig3.update_layout(
+                        title='Rho by Strike (Interest Rate Sensitivity)',
+                        xaxis_title='Strike Price',
+                        yaxis_title='Rho',
+                        hovermode='x unified',
+                        height=400
+                    )
+                    
+                    st.plotly_chart(fig3, use_container_width=True)
+                
+                # Greeks Summary
+                st.markdown("### 📋 Key Greeks Insights")
+                
+                insight_col1, insight_col2, insight_col3 = st.columns(3)
+                
+                # Find ATM option (closest to current price)
+                atm_call = calls_greeks_df.iloc[(calls_greeks_df['Strike'] - current_price).abs().argsort()[:1]]
+                atm_put = puts_greeks_df.iloc[(puts_greeks_df['Strike'] - current_price).abs().argsort()[:1]]
+                
+                with insight_col1:
+                    st.metric("ATM Call Delta", f"{atm_call['Delta'].values[0]:.3f}")
+                    st.caption("~0.5 means 50% chance of expiring ITM")
+                    st.metric("ATM Put Delta", f"{atm_put['Delta'].values[0]:.3f}")
+                    st.caption("Negative for puts")
+                
+                with insight_col2:
+                    st.metric("ATM Gamma", f"{atm_call['Gamma'].values[0]:.4f}")
+                    st.caption("Higher = Delta changes faster")
+                    st.metric("ATM Theta (Daily)", f"${atm_call['Theta'].values[0]:.2f}")
+                    st.caption("Daily time decay")
+                
+                with insight_col3:
+                    st.metric("ATM Vega", f"{atm_call['Vega'].values[0]:.2f}")
+                    st.caption("Gain per 1% volatility increase")
+                    st.metric("ATM Rho", f"{atm_call['Rho'].values[0]:.2f}")
+                    st.caption("Gain per 1% rate increase")
+            
+            else:
+                st.warning("No ATM options found for Greeks calculation.")
+            
+            # =================================================================
             # DISPLAY SECTION
             # =================================================================
             st.markdown('<div class="section-header">📊 Display Section</div>', unsafe_allow_html=True)
