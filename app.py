@@ -14,6 +14,7 @@ from data_fetcher import DataFetcher
 from options_pricing import OptionsPricing
 from predictive_models import PredictiveModels
 from ai_recommendations import AIRecommendations
+from futures_recommendations import FuturesRecommendations
 
 # Page configuration
 st.set_page_config(
@@ -75,7 +76,11 @@ st.markdown('<div class="main-header">📈 AI Options & Futures Strategy Analyze
 st.sidebar.markdown("## 📊 Inputs Section")
 
 # Ticker input
-ticker = st.sidebar.text_input("Ticker Symbol", value="AAPL", help="Enter stock ticker symbol (e.g., AAPL, MSFT, TSLA)").upper()
+ticker = st.sidebar.text_input(
+    "Ticker Symbol", 
+    value="AAPL", 
+    help="Enter stock ticker (e.g., AAPL, MSFT) or futures symbol (e.g., ES=F, GC=F, CL=F)"
+).upper()
 
 # Initialize session state
 if 'data_loaded' not in st.session_state:
@@ -92,10 +97,22 @@ if st.sidebar.button("Load Data") or st.session_state.current_ticker != ticker:
             st.session_state.current_price = data_fetcher.get_current_price()
             st.session_state.historical_data = data_fetcher.get_historical_data()
             st.session_state.volatility = data_fetcher.calculate_historical_volatility()
-            st.session_state.available_expirations = data_fetcher.get_available_expirations()
+            st.session_state.is_futures = data_fetcher.is_futures
+            
+            # Load futures or options specific data
+            if data_fetcher.is_futures:
+                st.session_state.futures_info = data_fetcher.get_futures_info()
+                st.session_state.margin_info = data_fetcher.get_futures_margin_estimate(st.session_state.current_price)
+                st.session_state.available_expirations = []
+                st.sidebar.success(f"✅ Futures data loaded for {ticker}")
+            else:
+                st.session_state.available_expirations = data_fetcher.get_available_expirations()
+                st.session_state.futures_info = None
+                st.session_state.margin_info = None
+                st.sidebar.success(f"✅ Stock/Options data loaded for {ticker}")
+            
             st.session_state.data_loaded = True
             st.session_state.current_ticker = ticker
-            st.sidebar.success(f"✅ Data loaded for {ticker}")
         except Exception as e:
             st.sidebar.error(f"Error loading data: {str(e)}")
             st.session_state.data_loaded = False
@@ -104,22 +121,41 @@ if st.sidebar.button("Load Data") or st.session_state.current_ticker != ticker:
 if st.session_state.data_loaded:
     # Display current price and volatility
     st.sidebar.markdown("### 💰 Current Market Data")
-    st.sidebar.metric("Current Price", f"${st.session_state.current_price:.2f}")
+    
+    # Check if futures or stock/options
+    is_futures = st.session_state.get('is_futures', False)
+    
+    if is_futures:
+        st.sidebar.info("🔮 **FUTURES CONTRACT DETECTED**")
+        st.sidebar.metric("Futures Price", f"${st.session_state.current_price:.2f}")
+        
+        if st.session_state.futures_info:
+            st.sidebar.metric("Contract Multiplier", f"{st.session_state.futures_info['contract_multiplier']}x")
+            st.sidebar.metric("Contract Value", f"${st.session_state.futures_info['current_price'] * st.session_state.futures_info['contract_multiplier']:,.2f}")
+        
+        if st.session_state.margin_info:
+            st.sidebar.metric("Est. Initial Margin", f"${st.session_state.margin_info['initial_margin']:,.2f}")
+            st.sidebar.metric("Est. Maint. Margin", f"${st.session_state.margin_info['maintenance_margin']:,.2f}")
+    else:
+        st.sidebar.metric("Current Price", f"${st.session_state.current_price:.2f}")
     
     if st.session_state.volatility:
         st.sidebar.metric("Annual Volatility (252 days)", f"{st.session_state.volatility*100:.2f}%")
     else:
         st.sidebar.warning("Unable to calculate volatility")
     
-    # Expiration date selection
-    st.sidebar.markdown("### 📅 Expiration Date")
-    if len(st.session_state.available_expirations) > 0:
-        selected_expiration = st.sidebar.selectbox(
-            "Select Expiration Date",
-            st.session_state.available_expirations
-        )
+    # Expiration date selection (only for options)
+    if not is_futures:
+        st.sidebar.markdown("### 📅 Expiration Date")
+        if len(st.session_state.available_expirations) > 0:
+            selected_expiration = st.sidebar.selectbox(
+                "Select Expiration Date",
+                st.session_state.available_expirations
+            )
+        else:
+            st.sidebar.error("No expiration dates available")
+            selected_expiration = None
     else:
-        st.sidebar.error("No expiration dates available")
         selected_expiration = None
     
     # Risk parameters
@@ -870,6 +906,306 @@ if st.session_state.data_loaded:
         else:
             st.error("Unable to load options data for selected expiration date.")
     
+    elif is_futures:
+        # ================================================================
+        # FUTURES ANALYSIS SECTION
+        # ================================================================
+        st.markdown('<div class="section-header">🔮 Futures Contract Analysis</div>', unsafe_allow_html=True)
+        
+        futures_info = st.session_state.futures_info
+        margin_info = st.session_state.margin_info
+        current_price = st.session_state.current_price
+        
+        # Display futures contract info
+        st.markdown("### 📋 Contract Information")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Symbol", futures_info['symbol'])
+            st.metric("Current Price", f"${current_price:.2f}")
+        
+        with col2:
+            st.metric("Contract Multiplier", f"{futures_info['contract_multiplier']}x")
+            st.metric("Contract Value", f"${futures_info['current_price'] * futures_info['contract_multiplier']:,.2f}")
+        
+        with col3:
+            st.metric("Initial Margin", f"${margin_info['initial_margin']:,.2f}")
+            st.metric("Maintenance Margin", f"${margin_info['maintenance_margin']:,.2f}")
+        
+        with col4:
+            st.metric("Exchange", futures_info.get('exchange', 'N/A'))
+            st.metric("Currency", futures_info.get('currency', 'USD'))
+        
+        # ================================================================
+        # MONTE CARLO SIMULATION FOR FUTURES
+        # ================================================================
+        st.markdown('<div class="section-header">🎲 Monte Carlo Simulation</div>', unsafe_allow_html=True)
+        
+        historical_data = st.session_state.historical_data
+        
+        if not historical_data.empty and st.session_state.volatility:
+            sigma = st.session_state.volatility
+            
+            # Run Monte Carlo simulation (30 days forward for futures)
+            with st.spinner("Running Monte Carlo simulation..."):
+                mc_prices = PredictiveModels.monte_carlo_simulation(
+                    current_price,
+                    sigma,
+                    30,  # 30 days forward
+                    num_simulations
+                )
+            
+            # Plot Monte Carlo paths
+            fig_mc = go.Figure()
+            
+            # Plot sample paths (20 random paths)
+            num_paths_to_plot = min(20, num_simulations)
+            for i in range(num_paths_to_plot):
+                fig_mc.add_trace(go.Scatter(
+                    y=mc_prices[i],
+                    mode='lines',
+                    line=dict(width=1, color='lightblue'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            # Plot mean path
+            mean_path = mc_prices.mean(axis=0)
+            fig_mc.add_trace(go.Scatter(
+                y=mean_path,
+                mode='lines',
+                name='Mean Path',
+                line=dict(width=3, color='red')
+            ))
+            
+            # Add current price line
+            fig_mc.add_hline(y=current_price, line_dash="dash", line_color="green",
+                           annotation_text="Current Price")
+            
+            fig_mc.update_layout(
+                title='Monte Carlo Price Simulation (30 Days)',
+                xaxis_title='Days',
+                yaxis_title='Price ($)',
+                hovermode='x unified',
+                height=500
+            )
+            
+            st.plotly_chart(fig_mc, use_container_width=True)
+            
+            # MC Statistics
+            final_prices = mc_prices[:, -1]
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Expected Price (30d)", f"${np.mean(final_prices):.2f}")
+                st.metric("Probability Up", f"{np.mean(final_prices > current_price)*100:.1f}%")
+            
+            with col2:
+                st.metric("Median Price", f"${np.median(final_prices):.2f}")
+                st.metric("Probability Down", f"{np.mean(final_prices < current_price)*100:.1f}%")
+            
+            with col3:
+                st.metric("95th Percentile", f"${np.percentile(final_prices, 95):.2f}")
+                st.metric("Upside Potential", f"${np.percentile(final_prices, 75) - current_price:.2f}")
+            
+            with col4:
+                st.metric("5th Percentile", f"${np.percentile(final_prices, 5):.2f}")
+                st.metric("Downside Risk", f"${current_price - np.percentile(final_prices, 25):.2f}")
+            
+            # ================================================================
+            # ML PREDICTIONS FOR FUTURES
+            # ================================================================
+            st.markdown('<div class="section-header">🤖 Machine Learning Predictions</div>', unsafe_allow_html=True)
+            
+            with st.spinner("Training predictive models..."):
+                ml_predictions = PredictiveModels.predict_future_price(
+                    historical_data,
+                    days_ahead=30
+                )
+            
+            if ml_predictions:
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    dt_pred = ml_predictions.get('decision_tree', current_price)
+                    dt_change = ((dt_pred - current_price) / current_price) * 100
+                    st.metric("Decision Tree", f"${dt_pred:.2f}", f"{dt_change:+.2f}%")
+                
+                with col2:
+                    svm_pred = ml_predictions.get('svm', current_price)
+                    svm_change = ((svm_pred - current_price) / current_price) * 100
+                    st.metric("SVM (RBF)", f"${svm_pred:.2f}", f"{svm_change:+.2f}%")
+                
+                with col3:
+                    avg_pred = (dt_pred + svm_pred) / 2
+                    avg_change = ((avg_pred - current_price) / current_price) * 100
+                    st.metric("Average", f"${avg_pred:.2f}", f"{avg_change:+.2f}%")
+                
+                st.info(f"**Consensus:** {'🐂 Bullish' if avg_change > 0 else '🐻 Bearish'} - Models predict {avg_change:+.2f}% move")
+            
+            # ================================================================
+            # FUTURES AI RECOMMENDATIONS
+            # ================================================================
+            st.markdown('<div class="section-header">🎯 AI Futures Trading Recommendation</div>', unsafe_allow_html=True)
+            
+            # Generate futures recommendation
+            with st.spinner("Generating AI recommendation..."):
+                recommendation = FuturesRecommendations.generate_futures_recommendation(
+                    current_price=current_price,
+                    futures_info=futures_info,
+                    margin_info=margin_info,
+                    monte_carlo_results=mc_prices,
+                    ml_predictions=ml_predictions,
+                    portfolio_value=portfolio_value,
+                    risk_percentage=risk_percentage,
+                    volatility=sigma
+                )
+            
+            # Display recommendation
+            st.markdown("### 🏆 Trading Recommendation")
+            
+            st.info(f"""
+            **AI Analysis Summary:**
+            - Portfolio Value: ${portfolio_value:,.2f}
+            - Risk per Trade: {risk_percentage}% (${portfolio_value * risk_percentage / 100:,.2f})
+            - Based on {num_simulations:,} Monte Carlo simulations
+            - **SVM Model Integration**: Price predictions with RBF kernel
+            - Contract multiplier: {futures_info['contract_multiplier']}x
+            """)
+            
+            # Recommendation card
+            confidence_class = f"recommendation-{recommendation['confidence'].lower()}"
+            
+            st.markdown(f"""
+            <div class="{confidence_class}">
+            <h3>{recommendation['action']} - {recommendation['confidence']} CONFIDENCE</h3>
+            <p><strong>Symbol:</strong> {recommendation['symbol']}</p>
+            <p><strong>Current Price:</strong> ${recommendation['current_price']:.2f}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Metrics display
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Probability Up", f"{recommendation['probability_up']*100:.1f}%")
+                st.metric("Expected Price", f"${recommendation['expected_price']:.2f}")
+            
+            with col2:
+                st.metric("Probability Down", f"{recommendation['probability_down']*100:.1f}%")
+                st.metric("Risk-Adj Return", f"{recommendation['risk_adjusted_return']:.4f}")
+            
+            with col3:
+                st.metric("Position Size", f"{recommendation['position_size']} contracts")
+                st.metric("Total Margin", f"${recommendation['total_margin_required']:,.2f}")
+            
+            with col4:
+                st.metric("Contract Value", f"${recommendation['contract_value']:,.2f}")
+                st.metric("Expected Return", f"${recommendation['expected_return']:,.2f}")
+            
+            # SVM Model Score and Prediction
+            ml_score_col1, ml_score_col2 = st.columns(2)
+            with ml_score_col1:
+                st.progress(recommendation['ml_score'] / 100, text=f"SVM Model Score: {recommendation['ml_score']:.0f}/100")
+            with ml_score_col2:
+                change_indicator = "📈" if recommendation['svm_predicted_change'] > 0 else "📉"
+                st.metric(f"{change_indicator} SVM Prediction", 
+                         f"${recommendation['svm_predicted_price']:.2f}", 
+                         f"{recommendation['svm_predicted_change']:.2f}%")
+            
+            # Trading Plan Details
+            with st.expander("📋 Trading Plan & Execution Details"):
+                # Entry Parameters
+                st.markdown("#### 🎯 ENTRY PARAMETERS")
+                entry_col1, entry_col2, entry_col3 = st.columns(3)
+                
+                with entry_col1:
+                    st.metric("Entry Price", f"${recommendation['entry_price']:.2f}")
+                    st.metric("Contract Multiplier", f"{recommendation['contract_multiplier']}x")
+                
+                with entry_col2:
+                    st.metric("Position Size", f"{recommendation['position_size']} contracts")
+                    st.metric("Total Margin Required", f"${recommendation['total_margin_required']:,.2f}")
+                
+                with entry_col3:
+                    st.metric("Contract Value", f"${recommendation['contract_value']:,.2f}")
+                    st.metric("ATR Estimate", f"${recommendation['atr_estimate']:.2f}")
+                
+                st.markdown("---")
+                
+                # Exit Parameters
+                st.markdown("#### 🎯 EXIT PARAMETERS")
+                exit_col1, exit_col2, exit_col3 = st.columns(3)
+                
+                with exit_col1:
+                    st.metric("Profit Target 1 (2:1)", f"${recommendation['profit_target_1']:.2f}")
+                    st.metric("Potential Profit", f"${recommendation['profit_1']:,.2f}")
+                
+                with exit_col2:
+                    st.metric("Profit Target 2 (3:1)", f"${recommendation['profit_target_2']:.2f}")
+                    st.metric("Potential Profit", f"${recommendation['profit_2']:,.2f}")
+                
+                with exit_col3:
+                    st.metric("Stop Loss", f"${recommendation['stop_loss']:.2f}")
+                    st.metric("Max Loss", f"${recommendation['max_loss']:,.2f}")
+                
+                st.markdown("---")
+                
+                # Risk/Reward Analysis
+                st.markdown("#### ⚖️ RISK/REWARD ANALYSIS")
+                rr_col1, rr_col2, rr_col3 = st.columns(3)
+                
+                with rr_col1:
+                    st.metric("Risk/Reward Ratio 1", f"{recommendation['risk_reward_1']:.2f}:1")
+                
+                with rr_col2:
+                    st.metric("Risk/Reward Ratio 2", f"{recommendation['risk_reward_2']:.2f}:1")
+                
+                with rr_col3:
+                    st.metric("% of Portfolio at Risk", f"{(recommendation['max_loss']/portfolio_value)*100:.2f}%")
+                
+                st.markdown("---")
+                
+                # ML Insights
+                st.markdown("#### 🤖 SVM MODEL INSIGHTS")
+                ml_col1, ml_col2, ml_col3 = st.columns(3)
+                
+                with ml_col1:
+                    st.metric("ML Score", f"{recommendation['ml_score']:.0f}/100")
+                
+                with ml_col2:
+                    st.metric("Predicted Price", f"${recommendation['svm_predicted_price']:.2f}")
+                
+                with ml_col3:
+                    change_delta = "+" if recommendation['svm_predicted_change'] > 0 else ""
+                    st.metric("Predicted Change", f"{change_delta}{recommendation['svm_predicted_change']:.2f}%")
+                
+                # Display ML insights
+                if recommendation['ml_insights']:
+                    ml_insights_list = recommendation['ml_insights'].split(' | ')
+                    for insight in ml_insights_list:
+                        if '✅' in insight or 'Supports' in insight or 'Strong' in insight:
+                            st.success(f"✓ {insight}")
+                        elif '⚠️' in insight or 'Contradicts' in insight:
+                            st.warning(f"⚠ {insight}")
+                        else:
+                            st.info(f"ℹ {insight}")
+                
+                st.caption("**SVM Analysis:** Support Vector Machine with RBF kernel predicts future price movement based on historical patterns and current market conditions.")
+            
+            # Risk Warning
+            st.warning("""
+            ⚠️ **FUTURES TRADING RISK WARNING:**
+            - Futures contracts are leveraged instruments with substantial risk
+            - Margin requirements can change based on volatility
+            - Losses can exceed initial margin deposited
+            - These are AI-generated recommendations for educational purposes
+            - Always use proper risk management and stop losses
+            """)
+        
+        else:
+            st.error("Insufficient historical data for analysis.")
+    
     else:
         st.warning("⚠️ Please select an expiration date from the sidebar.")
 
@@ -882,21 +1218,22 @@ else:
     
     ### How to Use This Application:
     
-    1. **Enter Ticker Symbol** - Input any stock ticker (e.g., AAPL, MSFT, TSLA)
+    1. **Enter Ticker Symbol** - Input any stock ticker (e.g., AAPL, MSFT) or futures symbol (e.g., ES=F, GC=F, CL=F)
     2. **Load Data** - Click the "Load Data" button to fetch market data
-    3. **Select Expiration** - Choose an options expiration date
+    3. **Select Expiration** - Choose an options expiration date (for stocks) or skip (for futures)
     4. **Adjust Parameters** - Fine-tune risk parameters and portfolio settings
     5. **Review Analysis** - Examine the comprehensive analysis including:
-       - Live options prices
-       - Fair value calculations
+       - Live options/futures prices
+       - Fair value calculations (options)
        - Monte Carlo simulations
        - ML price predictions
        - AI-powered trading recommendations
     
     ### Features:
     
-    - **📊 Live Data:** Real-time stock and options prices
-    - **💎 Fair Value:** Black-Scholes and Binomial Tree pricing
+    - **📊 Live Data:** Real-time stock, options, and futures prices
+    - **🔮 Futures Support:** Full support for futures contracts with margin analysis
+    - **💎 Fair Value:** Black-Scholes and Binomial Tree pricing (options)
     - **🎲 Monte Carlo:** Thousands of simulated price paths
     - **🤖 Machine Learning:** Decision Tree and SVM predictions
     - **🎯 AI Recommendations:** Smart trading strategies based on all data

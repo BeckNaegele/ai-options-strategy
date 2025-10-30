@@ -1,5 +1,5 @@
 """
-Data fetcher module for retrieving stock and options data
+Data fetcher module for retrieving stock, options, and futures data
 """
 import yfinance as yf
 import pandas as pd
@@ -8,11 +8,12 @@ from datetime import datetime, timedelta
 
 
 class DataFetcher:
-    """Fetches live market data for stocks and options"""
+    """Fetches live market data for stocks, options, and futures"""
     
     def __init__(self, ticker: str):
         self.ticker = ticker
         self.stock = yf.Ticker(ticker)
+        self.is_futures = self._check_if_futures(ticker)
         
     def get_current_price(self):
         """Get current stock price"""
@@ -83,4 +84,91 @@ class DataFetcher:
             return 0.05  # Default fallback
         except:
             return 0.05  # Default fallback
+    
+    def _check_if_futures(self, ticker: str) -> bool:
+        """Check if ticker is a futures contract"""
+        # Common futures patterns
+        futures_indicators = ['=F', '/']
+        return any(indicator in ticker.upper() for indicator in futures_indicators)
+    
+    def get_futures_info(self):
+        """Get futures contract information"""
+        if not self.is_futures:
+            return None
+        
+        try:
+            info = self.stock.info
+            current_price = self.get_current_price()
+            
+            # Calculate contract multiplier based on common futures
+            multiplier = self._get_contract_multiplier(self.ticker)
+            
+            return {
+                'symbol': self.ticker,
+                'current_price': current_price,
+                'contract_multiplier': multiplier,
+                'currency': info.get('currency', 'USD'),
+                'name': info.get('shortName', self.ticker),
+                'exchange': info.get('exchange', 'N/A')
+            }
+        except Exception as e:
+            print(f"Error fetching futures info: {e}")
+            # Return basic info even if API fails
+            return {
+                'symbol': self.ticker,
+                'current_price': self.get_current_price(),
+                'contract_multiplier': self._get_contract_multiplier(self.ticker),
+                'currency': 'USD',
+                'name': self.ticker,
+                'exchange': 'N/A'
+            }
+    
+    def _get_contract_multiplier(self, ticker: str) -> int:
+        """Get contract multiplier for common futures contracts"""
+        ticker_upper = ticker.upper()
+        
+        # Common futures multipliers
+        multipliers = {
+            'ES': 50,      # E-mini S&P 500
+            'NQ': 20,      # E-mini Nasdaq-100
+            'YM': 5,       # E-mini Dow
+            'RTY': 50,     # E-mini Russell 2000
+            'CL': 1000,    # Crude Oil
+            'GC': 100,     # Gold
+            'SI': 5000,    # Silver
+            'NG': 10000,   # Natural Gas
+            'ZB': 1000,    # 30-Year T-Bond
+            'ZN': 1000,    # 10-Year T-Note
+            'ZC': 50,      # Corn
+            'ZS': 50,      # Soybeans
+            'ZW': 50,      # Wheat
+            '6E': 125000,  # Euro FX
+            '6J': 12500000,# Japanese Yen
+            '6B': 62500,   # British Pound
+        }
+        
+        # Check for known multipliers
+        for symbol, multiplier in multipliers.items():
+            if ticker_upper.startswith(symbol):
+                return multiplier
+        
+        # Default multiplier for unknown contracts
+        return 1
+    
+    def get_futures_margin_estimate(self, current_price: float) -> dict:
+        """Estimate initial and maintenance margin for futures contract"""
+        # These are rough estimates - actual margins vary by broker and contract
+        multiplier = self._get_contract_multiplier(self.ticker)
+        contract_value = current_price * multiplier
+        
+        # Typical margin is 5-15% of contract value
+        initial_margin = contract_value * 0.10  # 10% estimate
+        maintenance_margin = contract_value * 0.075  # 7.5% estimate
+        
+        return {
+            'initial_margin': initial_margin,
+            'maintenance_margin': maintenance_margin,
+            'contract_value': contract_value,
+            'multiplier': multiplier
+        }
 
