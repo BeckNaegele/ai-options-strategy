@@ -477,6 +477,137 @@ if st.session_state.data_loaded:
                 }).background_gradient(subset=['Call_Diff_%', 'Put_Diff_%'], cmap='RdYlGn_r'),
                     use_container_width=True)
                 
+                # Visual Key for Diff% Columns
+                with st.expander("🔑 Visual Key - Call_Diff_% & Put_Diff_% Color Coding"):
+                    st.markdown("### Understanding the Percentage Difference Columns")
+                    
+                    key_col1, key_col2, key_col3 = st.columns(3)
+                    
+                    with key_col1:
+                        st.markdown("""
+                        #### 🟢 Green (Positive %)
+                        **Market > Fair Value**
+                        
+                        **Meaning:** Option is trading **above** its theoretical fair value
+                        
+                        **Interpretation:**
+                        - Potentially **overpriced**
+                        - Market is paying a **premium**
+                        - Consider **SELLING** if green
+                        
+                        **Example:**
+                        ```
+                        Market: $5.50
+                        Fair:   $5.00
+                        Diff:   +10.0% 🟢
+                        
+                        → Option is 10% expensive
+                        → Sell opportunity
+                        ```
+                        """)
+                    
+                    with key_col2:
+                        st.markdown("""
+                        #### 🟡 Yellow (Near 0%)
+                        **Market ≈ Fair Value**
+                        
+                        **Meaning:** Option is trading **at or near** its theoretical fair value
+                        
+                        **Interpretation:**
+                        - **Fairly priced**
+                        - Market is efficient
+                        - No clear arbitrage
+                        
+                        **Example:**
+                        ```
+                        Market: $5.02
+                        Fair:   $5.00
+                        Diff:   +0.4% 🟡
+                        
+                        → Option is fairly priced
+                        → No edge either way
+                        ```
+                        """)
+                    
+                    with key_col3:
+                        st.markdown("""
+                        #### 🔴 Red (Negative %)
+                        **Market < Fair Value**
+                        
+                        **Meaning:** Option is trading **below** its theoretical fair value
+                        
+                        **Interpretation:**
+                        - Potentially **underpriced**
+                        - Market is offering a **discount**
+                        - Consider **BUYING** if red
+                        
+                        **Example:**
+                        ```
+                        Market: $4.50
+                        Fair:   $5.00
+                        Diff:   -10.0% 🔴
+                        
+                        → Option is 10% cheap
+                        → Buy opportunity
+                        ```
+                        """)
+                    
+                    st.markdown("---")
+                    
+                    st.markdown("""
+                    ### 🎨 Color Gradient Scale
+                    
+                    The table uses a **Red-Yellow-Green gradient** (reversed) to highlight opportunities:
+                    """)
+                    
+                    gradient_cols = st.columns([1, 3, 1])
+                    
+                    with gradient_cols[1]:
+                        st.markdown("""
+                        ```
+                        🔴 Deep Red    (-15% or more)   Strong BUY signal
+                        🟠 Red         (-10% to -5%)    Good BUY signal
+                        🟡 Yellow      (-5% to +5%)     Fair pricing
+                        🟢 Light Green (+5% to +10%)    Good SELL signal
+                        🟢 Deep Green  (+15% or more)   Strong SELL signal
+                        ```
+                        """)
+                    
+                    st.markdown("---")
+                    
+                    st.markdown("""
+                    ### 📊 How to Use This Information
+                    
+                    **For BUYERS (Looking to open long positions):**
+                    1. Look for **red cells** (negative percentages)
+                    2. Deeper red = Better deal
+                    3. Target: -5% or lower for good value
+                    
+                    **For SELLERS (Looking to write options):**
+                    1. Look for **green cells** (positive percentages)
+                    2. Deeper green = Better premium
+                    3. Target: +5% or higher for good premium collection
+                    
+                    **For ALL TRADERS:**
+                    - **Yellow cells** indicate efficient pricing - no clear edge
+                    - Extreme values (±15%+) may indicate:
+                      - Genuine mispricing opportunity ✅
+                      - Model assumptions off (volatility, etc.) ⚠️
+                      - Illiquid strikes with wide spreads ⚠️
+                    
+                    **Important Notes:**
+                    - Compare Call_Diff_% and Put_Diff_% at the same strike
+                    - If both are similar color → Consistent mispricing signal
+                    - If different colors → May indicate skew or model issues
+                    - Always check **volume** and **open interest** for liquidity
+                    """)
+                    
+                    st.info("""
+                    💡 **Pro Tip:** The AI Recommendation system automatically incorporates these 
+                    fair value differences into its analysis. Options with favorable Diff_% values 
+                    (red for buys, green for sells) will rank higher in recommendations.
+                    """)
+                
                 # Visualization of fair value vs market
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
