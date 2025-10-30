@@ -767,7 +767,8 @@ if st.session_state.data_loaded:
                 - Risk per Trade: {risk_percentage}% (${portfolio_value * risk_percentage / 100:,.2f})
                 - Based on {num_simulations:,} Monte Carlo simulations
                 - Incorporating ML predictions and fair value analysis
-                - Considering liquidity and risk-adjusted returns
+                - **Greeks-Enhanced Analysis**: Delta, Gamma, Theta, Vega, Rho
+                - Considering liquidity, time decay, and risk-adjusted returns
                 """)
                 
                 for idx, row in top_recs.iterrows():
@@ -797,6 +798,20 @@ if st.session_state.data_loaded:
                     with col4:
                         st.metric("Position Size", f"{row['position_size']} contracts")
                         st.metric("Total Cost", f"${row['total_cost']:.2f}")
+                    
+                    # Greeks Summary (compact display)
+                    greeks_col1, greeks_col2, greeks_col3, greeks_col4 = st.columns(4)
+                    with greeks_col1:
+                        st.metric("Delta", f"{row['delta']:.3f}", help="Price sensitivity")
+                    with greeks_col2:
+                        st.metric("Gamma", f"{row['gamma']:.4f}", help="Delta change rate")
+                    with greeks_col3:
+                        st.metric("Theta", f"${row['theta']:.2f}", help="Daily time decay")
+                    with greeks_col4:
+                        st.metric("Vega", f"{row['vega']:.2f}", help="Volatility sensitivity")
+                    
+                    # Greeks Score
+                    st.progress(row['greeks_score'] / 100, text=f"Greeks Score: {row['greeks_score']:.0f}/100")
                     
                     with st.expander("📋 Trading Plan & Execution Details"):
                         # Entry Parameters
@@ -852,6 +867,25 @@ if st.session_state.data_loaded:
                             st.metric("% of Portfolio at Risk", f"{(row['max_loss_amount']/portfolio_value)*100:.2f}%")
                         
                         st.info(f"**Exit Strategy:** {row['exit_strategy']}")
+                        
+                        st.markdown("---")
+                        
+                        # Greeks Insights
+                        st.markdown("#### 📐 GREEKS INSIGHTS")
+                        st.write(f"**Greeks Score:** {row['greeks_score']:.0f}/100")
+                        
+                        # Display insights as bullet points
+                        if row['greeks_insights']:
+                            insights_list = row['greeks_insights'].split(' | ')
+                            for insight in insights_list:
+                                if '✅' in insight or 'Good' in insight or 'Strong' in insight:
+                                    st.success(f"✓ {insight}")
+                                elif '⚠️' in insight or 'High risk' in insight or 'Low' in insight:
+                                    st.warning(f"⚠ {insight}")
+                                else:
+                                    st.info(f"ℹ {insight}")
+                        
+                        st.caption("**Greeks Analysis:** The AI has analyzed Delta, Gamma, Theta, Vega, and Rho to assess this trade's sensitivity to price, time, and volatility changes.")
                     
                     st.markdown("---")
                 

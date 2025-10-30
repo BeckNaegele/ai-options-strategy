@@ -93,6 +93,120 @@ class AIRecommendations:
         return num_contracts
     
     @staticmethod
+    def analyze_greeks_for_recommendation(greeks, action, days_to_expiration, volatility):
+        """
+        Analyze Greeks to provide trading insights and adjust confidence
+        Returns: (greeks_score, greeks_insights, confidence_adjustment)
+        """
+        delta = greeks['delta']
+        gamma = greeks['gamma']
+        theta = greeks['theta']
+        vega = greeks['vega']
+        rho = greeks['rho']
+        
+        greeks_score = 0
+        insights = []
+        confidence_adjustment = 0
+        
+        # Delta Analysis
+        abs_delta = abs(delta)
+        if 'BUY' in action:
+            if abs_delta > 0.6:
+                greeks_score += 15
+                insights.append(f"Strong Delta ({abs_delta:.2f}) - High price sensitivity")
+                confidence_adjustment += 0.05
+            elif abs_delta > 0.45:
+                greeks_score += 10
+                insights.append(f"Good Delta ({abs_delta:.2f}) - Moderate price sensitivity")
+            else:
+                greeks_score += 5
+                insights.append(f"Low Delta ({abs_delta:.2f}) - Limited price sensitivity")
+                confidence_adjustment -= 0.10
+        
+        # Gamma Analysis (important for position management)
+        if gamma > 0.05:
+            greeks_score += 10
+            insights.append(f"High Gamma ({gamma:.4f}) - Delta changes rapidly")
+            if days_to_expiration < 7:
+                insights.append("⚠️ High Gamma + Short expiry = High risk/reward")
+        elif gamma > 0.02:
+            greeks_score += 5
+            insights.append(f"Moderate Gamma ({gamma:.4f}) - Stable Delta")
+        
+        # Theta Analysis (time decay)
+        if 'BUY' in action:
+            # Negative theta hurts long positions
+            if theta < -0.10:
+                greeks_score -= 15
+                insights.append(f"⚠️ High Theta decay (${theta:.2f}/day) - Time works against you")
+                confidence_adjustment -= 0.15
+            elif theta < -0.05:
+                greeks_score -= 10
+                insights.append(f"Moderate Theta decay (${theta:.2f}/day)")
+                confidence_adjustment -= 0.05
+            else:
+                greeks_score -= 5
+                insights.append(f"Low Theta decay (${theta:.2f}/day) - Good for time")
+        else:  # SELL
+            # Negative theta helps short positions
+            if theta < -0.10:
+                greeks_score += 15
+                insights.append(f"✅ High Theta decay (${theta:.2f}/day) - Time works for you")
+                confidence_adjustment += 0.10
+            elif theta < -0.05:
+                greeks_score += 10
+                insights.append(f"Good Theta decay (${theta:.2f}/day)")
+        
+        # Vega Analysis (volatility sensitivity)
+        if vega > 0.15:
+            if 'BUY' in action:
+                greeks_score += 10
+                insights.append(f"High Vega ({vega:.2f}) - Gains from volatility increase")
+                # If current volatility is low, high vega is good for buys
+                if volatility < 0.25:
+                    greeks_score += 5
+                    insights.append("✅ Low current volatility + High Vega = Good setup")
+                    confidence_adjustment += 0.10
+            else:  # SELL
+                greeks_score += 5
+                insights.append(f"High Vega ({vega:.2f}) - Loses from volatility increase")
+                # If volatility is high, selling high vega is good
+                if volatility > 0.35:
+                    greeks_score += 10
+                    insights.append("✅ High volatility - Good time to sell premium")
+                    confidence_adjustment += 0.10
+        elif vega > 0.08:
+            greeks_score += 5
+            insights.append(f"Moderate Vega ({vega:.2f})")
+        
+        # Time to expiration considerations
+        if days_to_expiration < 7:
+            if 'BUY' in action:
+                greeks_score -= 10
+                insights.append("⚠️ Less than 7 days - High risk for buyers")
+                confidence_adjustment -= 0.10
+            else:
+                greeks_score += 10
+                insights.append("✅ Less than 7 days - Good for sellers (theta)")
+                confidence_adjustment += 0.10
+        elif days_to_expiration > 45:
+            if 'BUY' in action:
+                greeks_score += 5
+                insights.append("✅ Good time horizon for buyers")
+            else:
+                greeks_score -= 5
+                insights.append("⚠️ Long time to expiration - Slow theta decay")
+        
+        # Normalize greeks_score to 0-100
+        greeks_score = max(0, min(100, greeks_score + 50))
+        
+        return {
+            'greeks_score': greeks_score,
+            'insights': insights,
+            'confidence_adjustment': confidence_adjustment
+        }
+    
+    @staticmethod
     def calculate_buy_parameters(action, option_type, strike, current_price, bid, ask, 
                                  market_price, fair_value, probability_itm, mc_analysis):
         """
@@ -283,6 +397,11 @@ class AIRecommendations:
                 portfolio_value, risk_percentage, market_call_price
             )
             
+            # Calculate Greeks
+            call_greeks = OptionsPricing.calculate_greeks(
+                current_price, strike, T, risk_free_rate, volatility, 'call'
+            )
+            
             # Calculate expected return
             expected_payoff = mc_analysis['expected_payoff']
             cost = market_call_price * 100
@@ -293,7 +412,7 @@ class AIRecommendations:
                 cost
             )
             
-            # Create recommendation
+            # Create initial recommendation
             if valuation == 'undervalued' and mc_analysis['probability_itm'] > 0.45:
                 action = 'BUY CALL'
                 confidence = 'HIGH' if mc_analysis['probability_itm'] > 0.55 else 'MEDIUM'
@@ -303,6 +422,28 @@ class AIRecommendations:
             else:
                 action = 'HOLD'
                 confidence = 'LOW'
+            
+            # Analyze Greeks and adjust confidence
+            days_to_exp = OptionsPricing.days_to_expiration(expiration_date)
+            greeks_analysis = AIRecommendations.analyze_greeks_for_recommendation(
+                call_greeks, action, days_to_exp, volatility
+            )
+            
+            # Adjust confidence based on Greeks
+            if action != 'HOLD':
+                # Factor Greeks score into risk-adjusted return
+                greeks_multiplier = greeks_analysis['greeks_score'] / 100
+                risk_adjusted_return = risk_adjusted_return * greeks_multiplier
+                
+                # Adjust confidence level based on Greeks
+                if greeks_analysis['confidence_adjustment'] > 0.10:
+                    if confidence == 'MEDIUM':
+                        confidence = 'HIGH'
+                elif greeks_analysis['confidence_adjustment'] < -0.10:
+                    if confidence == 'HIGH':
+                        confidence = 'MEDIUM'
+                    elif confidence == 'MEDIUM':
+                        confidence = 'LOW'
             
             # Add liquidity check
             if call_volume < 10 or call_oi < 50:
@@ -356,7 +497,15 @@ class AIRecommendations:
                 'risk_reward_ratio_2': sell_params['risk_reward_ratio_2'],
                 'max_loss_amount': sell_params['max_loss_amount'],
                 'profit_1_amount': sell_params['profit_1_amount'],
-                'profit_2_amount': sell_params['profit_2_amount']
+                'profit_2_amount': sell_params['profit_2_amount'],
+                # Greeks
+                'delta': call_greeks['delta'],
+                'gamma': call_greeks['gamma'],
+                'theta': call_greeks['theta'],
+                'vega': call_greeks['vega'],
+                'rho': call_greeks['rho'],
+                'greeks_score': greeks_analysis['greeks_score'],
+                'greeks_insights': ' | '.join(greeks_analysis['insights'])
             })
         
         # Analyze puts
@@ -390,6 +539,11 @@ class AIRecommendations:
                 portfolio_value, risk_percentage, market_put_price
             )
             
+            # Calculate Greeks
+            put_greeks = OptionsPricing.calculate_greeks(
+                current_price, strike, T, risk_free_rate, volatility, 'put'
+            )
+            
             # Calculate expected return
             expected_payoff = mc_analysis['expected_payoff']
             cost = market_put_price * 100
@@ -400,7 +554,7 @@ class AIRecommendations:
                 cost
             )
             
-            # Create recommendation
+            # Create initial recommendation
             if valuation == 'undervalued' and mc_analysis['probability_itm'] > 0.45:
                 action = 'BUY PUT'
                 confidence = 'HIGH' if mc_analysis['probability_itm'] > 0.55 else 'MEDIUM'
@@ -410,6 +564,28 @@ class AIRecommendations:
             else:
                 action = 'HOLD'
                 confidence = 'LOW'
+            
+            # Analyze Greeks and adjust confidence
+            days_to_exp = OptionsPricing.days_to_expiration(expiration_date)
+            greeks_analysis = AIRecommendations.analyze_greeks_for_recommendation(
+                put_greeks, action, days_to_exp, volatility
+            )
+            
+            # Adjust confidence based on Greeks
+            if action != 'HOLD':
+                # Factor Greeks score into risk-adjusted return
+                greeks_multiplier = greeks_analysis['greeks_score'] / 100
+                risk_adjusted_return = risk_adjusted_return * greeks_multiplier
+                
+                # Adjust confidence level based on Greeks
+                if greeks_analysis['confidence_adjustment'] > 0.10:
+                    if confidence == 'MEDIUM':
+                        confidence = 'HIGH'
+                elif greeks_analysis['confidence_adjustment'] < -0.10:
+                    if confidence == 'HIGH':
+                        confidence = 'MEDIUM'
+                    elif confidence == 'MEDIUM':
+                        confidence = 'LOW'
             
             # Add liquidity check
             if put_volume < 10 or put_oi < 50:
@@ -463,7 +639,15 @@ class AIRecommendations:
                 'risk_reward_ratio_2': sell_params['risk_reward_ratio_2'],
                 'max_loss_amount': sell_params['max_loss_amount'],
                 'profit_1_amount': sell_params['profit_1_amount'],
-                'profit_2_amount': sell_params['profit_2_amount']
+                'profit_2_amount': sell_params['profit_2_amount'],
+                # Greeks
+                'delta': put_greeks['delta'],
+                'gamma': put_greeks['gamma'],
+                'theta': put_greeks['theta'],
+                'vega': put_greeks['vega'],
+                'rho': put_greeks['rho'],
+                'greeks_score': greeks_analysis['greeks_score'],
+                'greeks_insights': ' | '.join(greeks_analysis['insights'])
             })
         
         # Sort by risk-adjusted return
