@@ -158,7 +158,7 @@ if not st.session_state.legal_accepted:
     
     **Data may be delayed, inaccurate, or incomplete. Models may contain errors or produce incorrect results.**
     
-    All calculations are theoretical approximations based on mathematical models that may not reflect actual market conditions.
+    All calculations are theoretical approximations based on mathematical models that may NOT reflect actual market conditions.
     """)
     
     # Risk of Loss
@@ -232,11 +232,11 @@ if not st.session_state.legal_accepted:
     - Subject to significant limitations and assumptions
     
     **Hypothetical results have many inherent limitations**, including:
-    - They do not reflect actual trading, liquidity constraints, or market impact
-    - They may not account for slippage, commissions, and fees
+    - They do NOT reflect actual trading, liquidity constraints, or market impact
+    - They may NOT account for slippage, commissions, and fees
     - They are designed with benefit of hindsight
     - They assume perfect execution at displayed prices
-    - Past hypothetical performance is not indicative of future results
+    - Past hypothetical performance is NOT indicative of future results
     """)
     
     # Data Sources
@@ -264,7 +264,7 @@ if not st.session_state.legal_accepted:
     # Geographic Restrictions
     st.markdown("### 11. 🌍 GEOGRAPHIC RESTRICTIONS")
     st.markdown("""
-    This application may not be available or suitable for use in all jurisdictions. Users are responsible for ensuring their use complies with local laws.
+    This application may NOT be available or suitable for use in all jurisdictions. Users are responsible for ensuring their use complies with local laws.
     
     If you are located in a jurisdiction where use of this application would be illegal or unauthorized, you must immediately cease using it.
     """)
@@ -278,7 +278,7 @@ if not st.session_state.legal_accepted:
     
     **IF YOU CHOOSE TO USE THIS APPLICATION AFTER READING THESE TERMS, YOU DO SO AT YOUR OWN RISK AND ACCEPT FULL RESPONSIBILITY FOR ANY CONSEQUENCES.**
     
-    **Options and futures trading is not suitable for everyone. You should carefully consider whether trading is appropriate for your financial situation.**
+    **Options and futures trading is NOT suitable for everyone. You should carefully consider whether trading is appropriate for your financial situation.**
     """)
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -293,7 +293,7 @@ if not st.session_state.legal_accepted:
     
     with col2:
         acceptance_checkbox = st.checkbox(
-            "I have read, understood, and agree to all terms and conditions above. I acknowledge that this is for educational purposes only and not financial advice. I accept all risks and responsibilities.",
+            "I have read, understood, and agree to all terms and conditions above. I acknowledge that this is for educational purposes only and NOT financial advice. I accept all risks and responsibilities.",
             key="acceptance_checkbox"
         )
         
@@ -2075,8 +2075,8 @@ else:
     ### Risk Disclaimer:
     
     ⚠️ **This application is for educational and informational purposes only.**
-    It does not constitute financial advice. Trading options involves substantial
-    risk and is not suitable for all investors. Past performance does not guarantee
+    It does NOT constitute financial advice. Trading options involves substantial
+    risk and is NOT suitable for all investors. Past performance does NOT guarantee
     future results. Always do your own research and consult with a financial advisor.
     """)
 
