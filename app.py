@@ -8,6 +8,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
+import os
 
 # Import custom modules
 from data_fetcher import DataFetcher
@@ -15,7 +16,16 @@ from options_pricing import OptionsPricing
 from predictive_models import PredictiveModels
 from ai_recommendations import AIRecommendations
 from futures_recommendations import FuturesRecommendations
-from database import DisclaimerDatabase
+
+# Import PostgreSQL database (Supabase)
+try:
+    from database_postgres import DisclaimerDatabase
+    DATABASE_TYPE = "PostgreSQL"
+except ImportError:
+    # Fallback to SQLite if PostgreSQL not available
+    from database import DisclaimerDatabase
+    DATABASE_TYPE = "SQLite"
+
 from user_tracking import UserDataCollector
 from privacy_policy import PRIVACY_POLICY_HTML, PRIVACY_POLICY_VERSION
 
@@ -33,9 +43,23 @@ if 'legal_accepted' not in st.session_state:
 
 # Initialize database
 try:
-    db = DisclaimerDatabase()
+    # Get database connection string from Streamlit secrets or environment
+    if DATABASE_TYPE == "PostgreSQL":
+        connection_string = st.secrets.get("database", {}).get("url") or os.getenv("DATABASE_URL")
+        if connection_string:
+            db = DisclaimerDatabase(connection_string=connection_string)
+            print(f"✅ Connected to {DATABASE_TYPE} database")
+        else:
+            st.warning("⚠️ PostgreSQL connection string not found. Using SQLite fallback.")
+            from database import DisclaimerDatabase as SQLiteDB
+            db = SQLiteDB()
+            DATABASE_TYPE = "SQLite (Fallback)"
+    else:
+        db = DisclaimerDatabase()
+        print(f"✅ Connected to {DATABASE_TYPE} database")
 except Exception as e:
-    st.error(f"Database initialization error: {e}")
+    st.error(f"❌ Database initialization error: {e}")
+    st.info("App will continue without database functionality.")
     db = None
 
 # Inject browser detection script
@@ -2326,11 +2350,12 @@ if st.session_state.get('analytics_consent', False):
 st.markdown("---")
 
 # Standard Footer
-st.markdown("""
+st.markdown(f"""
 <div style='text-align: center; color: gray;'>
     <p>American Options & Futures Strategy Analyzer | Built with Streamlit</p>
     <p>⚠️ For educational purposes only. Not financial advice.</p>
     <p style='font-size: 0.8em;'>GDPR & CCPA Compliant | Privacy Policy v1.0 | Terms v1.0</p>
+    <p style='font-size: 0.7em; color: #888;'>Database: {DATABASE_TYPE}</p>
 </div>
 """, unsafe_allow_html=True)
 
