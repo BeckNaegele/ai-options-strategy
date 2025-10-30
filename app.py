@@ -517,6 +517,50 @@ if st.session_state.data_loaded:
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
+                
+                # Visual Key for Fair Value Chart
+                with st.expander("🔑 Visual Key - Fair Value Analysis Chart"):
+                    st.markdown("""
+                    #### Line Types & Colors:
+                    """)
+                    
+                    key_col1, key_col2 = st.columns(2)
+                    
+                    with key_col1:
+                        st.markdown("""
+                        **CALLS:**
+                        - 🔵 **Blue Solid Line**: Market Price (what traders are paying)
+                        - 🔵 **Light Blue Dashed Line**: Fair Value (theoretical price from Binomial model)
+                        
+                        **PUTS:**
+                        - 🔴 **Red Solid Line**: Market Price (what traders are paying)
+                        - 🔴 **Light Coral Dashed Line**: Fair Value (theoretical price from Binomial model)
+                        """)
+                    
+                    with key_col2:
+                        st.markdown("""
+                        **How to Interpret:**
+                        - **Market ABOVE Fair Value** → Option may be overpriced (potential sell)
+                        - **Market BELOW Fair Value** → Option may be underpriced (potential buy)
+                        - **Lines converge** → Fair pricing, efficient market
+                        - **Lines diverge** → Mispricing opportunity
+                        
+                        **Note:** ATM (at-the-money) options typically have the most liquidity and tightest pricing.
+                        """)
+                    
+                    st.markdown("---")
+                    st.markdown("""
+                    #### Table Column Meanings:
+                    - **Call_Diff_%** / **Put_Diff_%**: 
+                      - **Positive (Green)**: Market price is higher than fair value (potentially overvalued)
+                      - **Negative (Red)**: Market price is lower than fair value (potentially undervalued)
+                      - **Near 0%**: Fairly priced
+                    
+                    - **Black-Scholes vs Binomial**: 
+                      - BS = European-style approximation
+                      - Binomial = American-style (accounts for early exercise)
+                      - Binomial is generally more accurate for American options
+                    """)
             
             # Monte Carlo Simulation
             st.markdown("### 🎲 Monte Carlo Price Simulation")
@@ -565,25 +609,59 @@ if st.session_state.data_loaded:
             
             st.plotly_chart(fig_hist, use_container_width=True)
             
-            # Chart Legend/Key
-            with st.expander("📊 Chart Legend - Monte Carlo Simulation"):
+            # Visual Key for Distribution Chart
+            with st.expander("🔑 Visual Key - Distribution of Simulated Prices at Expiration"):
+                st.markdown("#### Chart Elements:")
+                
+                visual_col1, visual_col2 = st.columns(2)
+                
+                with visual_col1:
+                    st.markdown("""
+                    **Visual Elements:**
+                    - 📊 **Light Blue Bars**: Histogram showing frequency of simulated prices
+                      - **Taller bars** = More simulations ended at this price
+                      - **Peak of curve** = Most likely outcome
+                    
+                    - **📍 Red Dashed Vertical Line**: Current stock price (starting point)
+                      - Everything to the **right** = Price increased
+                      - Everything to the **left** = Price decreased
+                    
+                    - **📍 Green Dashed Vertical Line**: Mean (average) simulated price
+                      - Expected final price at expiration
+                      - Shows directional bias
+                    """)
+                
+                with visual_col2:
+                    st.markdown("""
+                    **How to Interpret:**
+                    - **Bell-shaped curve**: Normal market conditions
+                    - **Wide spread**: High volatility, uncertain outcome
+                    - **Narrow spread**: Low volatility, predictable outcome
+                    - **Green line right of red**: Bullish expectation
+                    - **Green line left of red**: Bearish expectation
+                    
+                    **Distribution Shape:**
+                    - **Symmetric**: Balanced up/down probability
+                    - **Right-skewed**: More upside potential
+                    - **Left-skewed**: More downside risk
+                    """)
+                
+                st.markdown("---")
                 st.markdown("""
-                **Price Distribution Histogram:**
-                - **Blue Bars**: Frequency of simulated final prices
-                - **Red Dashed Line**: Current stock price
-                - **Green Dashed Line**: Mean (average) simulated price
+                #### Example Reading:
                 
-                **How to Read:**
-                - Taller bars = More likely price outcomes
-                - Wider spread = Higher uncertainty/volatility
-                - Position of mean vs. current = Expected price movement direction
+                **Scenario:** Red line at $100, Green line at $105, Peak at $103
+                - **Current Price**: $100
+                - **Expected Price**: $105 (5% gain expected)
+                - **Most Likely**: $103 (the modal outcome)
+                - **Interpretation**: Bullish bias with likely 3-5% gain
                 
-                **Key Metrics:**
-                - **Mean**: Expected price based on risk-free drift
-                - **Median**: Middle value of all simulations
-                - **Percentiles**: Probability ranges (10th = 90% chance price is higher)
-                - **Probability > Current**: Likelihood of price increase
+                **Key Metrics Explained:**
+                - **10th/90th Percentile**: 80% of outcomes fall in this range
+                - **Probability > Current**: Chance of any profit at expiration
+                - **Mean vs Median**: If different, shows skewness (tail risk)
                 """)
+            
             
             # Machine Learning Predictions
             st.markdown("### 🤖 Machine Learning Price Predictions")
@@ -900,12 +978,12 @@ if st.session_state.data_loaded:
                     st.dataframe(display_all, use_container_width=True)
             
             # =================================================================
-            # SCORE EXPLANATIONS
+            # EXPLANATIONS SECTION
             # =================================================================
-            st.markdown("### 📚 Understanding AI Scores")
+            st.markdown("### 📚 Explanations")
             
             st.markdown("""
-            The AI recommendation system uses two key scoring mechanisms to evaluate each trade opportunity:
+            Understanding how the AI evaluates and scores trading opportunities:
             """)
             
             col1, col2 = st.columns(2)
@@ -1031,6 +1109,104 @@ Base Return: 0.0500
 × Greeks (70): 0.0350
 × ML (80):     0.0280 (final)
                     """, language="text")
+            
+            st.markdown("---")
+            
+            # Risk-Adjusted Returns Explanation
+            st.markdown("#### 💰 Risk-Adjusted Return")
+            
+            st.markdown("""
+            **What It Is:** A metric that measures the expected return of a trade relative to the capital at risk and probability of success.
+            
+            **Why It Matters:** High returns are meaningless if the probability of success is low or the capital required is excessive. 
+            Risk-adjusted return normalizes different opportunities for fair comparison.
+            """)
+            
+            rar_col1, rar_col2 = st.columns(2)
+            
+            with rar_col1:
+                st.markdown("""
+                **Formula:**
+                ```
+                Risk-Adjusted Return = 
+                    (Expected Payoff × Probability ITM - Cost)
+                    ────────────────────────────────────────
+                              Cost × Risk Factor
+                ```
+                
+                **Components:**
+                - **Expected Payoff**: Monte Carlo simulated option value at expiration
+                - **Probability ITM**: Likelihood option expires in-the-money
+                - **Cost**: Option premium × 100 × contracts
+                - **Risk Factor**: Greeks Score × ML Score (0-1 multipliers)
+                
+                **Adjustments Applied:**
+                1. **Base Return** = (Expected Payoff - Cost) / Cost
+                2. **× Greeks Score** = Adjusts for time decay, volatility sensitivity
+                3. **× ML Score** = Adjusts for price prediction alignment
+                4. **Result**: Final risk-adjusted return value
+                """)
+            
+            with rar_col2:
+                st.markdown("""
+                **Interpretation:**
+                - **> 0.02**: Strong return potential relative to risk
+                - **0.01 - 0.02**: Good return/risk balance
+                - **0 - 0.01**: Marginal return/risk profile
+                - **< 0**: Negative expected return (avoid)
+                
+                **Example Comparison:**
+                
+                **Option A:**
+                - Expected Return: $500
+                - Cost: $1,000
+                - Probability ITM: 60%
+                - Greeks: 80, ML: 75
+                - Risk-Adj Return: **0.0180**
+                
+                **Option B:**
+                - Expected Return: $800
+                - Cost: $2,000
+                - Probability ITM: 45%
+                - Greeks: 55, ML: 60
+                - Risk-Adj Return: **0.0074**
+                
+                **Winner: Option A** (better risk-adjusted return despite lower absolute profit)
+                """)
+            
+            with st.expander("🔍 Risk-Adjusted Return Calculation Example"):
+                st.code("""
+Real Trade Example:
+
+BUY CALL @ Strike $150
+Current Price: $148
+Days to Expiration: 30
+Option Premium: $3.50 per contract
+
+Step 1: Monte Carlo Simulation
+- Expected Option Value at Expiry: $5.80
+- Probability ITM: 62%
+- Expected Payoff: $5.80 × 62% = $3.60
+
+Step 2: Base Return Calculation
+- Cost: $3.50 × 100 = $350
+- Expected Payoff: $3.60 × 100 = $360
+- Raw Return: ($360 - $350) / $350 = 0.0286 (2.86%)
+
+Step 3: Greeks Adjustment
+- Greeks Score: 70/100 = 0.70 multiplier
+- Adjusted Return: 0.0286 × 0.70 = 0.0200
+
+Step 4: ML Adjustment
+- ML Score: 85/100 = 0.85 multiplier
+- Final Return: 0.0200 × 0.85 = 0.0170
+
+Final Risk-Adjusted Return: 0.0170 (1.70%)
+
+This means for every $1 of capital risked, you expect
+$0.017 in return after accounting for all risks and
+uncertainties (Greeks + ML predictions).
+                """, language="text")
             
             st.markdown("---")
             
