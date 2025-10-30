@@ -320,6 +320,30 @@ if not st.session_state.legal_accepted:
 # END LEGAL DISCLAIMER
 # ============================================================================
 
+# Scroll to top after accepting legal disclaimer
+if st.session_state.legal_accepted:
+    # Force scroll to top using multiple methods for reliability
+    st.markdown("""
+    <script>
+        // Immediate scroll
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        
+        // Delayed scroll to ensure DOM is fully loaded
+        setTimeout(function() {
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+        }, 100);
+        
+        // Additional delayed scroll for good measure
+        setTimeout(function() {
+            window.scrollTo({top: 0, behavior: 'instant'});
+        }, 200);
+    </script>
+    """, unsafe_allow_html=True)
+
 # Sidebar - Inputs Section
 st.sidebar.markdown("## 📊 Inputs Section")
 
