@@ -271,3 +271,5 @@ For issues or questions:
 
 Happy Trading! 📈🎯
 
+#   a i - o p t i o n s - s t r a t e g y  
+ 
