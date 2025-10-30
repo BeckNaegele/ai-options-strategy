@@ -24,6 +24,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state for legal acceptance
+if 'legal_accepted' not in st.session_state:
+    st.session_state.legal_accepted = False
+
 # Custom CSS
 st.markdown("""
 <style>
@@ -48,6 +52,33 @@ st.markdown("""
         border-radius: 0.5rem;
         margin: 0.5rem 0;
     }
+    .legal-disclaimer {
+        background-color: #fff3cd;
+        border: 3px solid #ff6b6b;
+        border-radius: 10px;
+        padding: 2rem;
+        margin: 2rem 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .legal-title {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #d32f2f;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    .legal-section {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        margin: 1rem 0;
+    }
+    .legal-highlight {
+        background-color: #ffebee;
+        padding: 1rem;
+        border-left: 4px solid #d32f2f;
+        margin: 1rem 0;
+        font-weight: bold;
+    }
     .recommendation-high {
         background-color: #d4edda;
         padding: 1rem;
@@ -71,6 +102,223 @@ st.markdown("""
 
 # Title
 st.markdown('<div class="main-header">📈 AI Options & Futures Strategy Analyzer</div>', unsafe_allow_html=True)
+
+# ============================================================================
+# LEGAL DISCLAIMER - MUST BE ACCEPTED TO USE APPLICATION
+# ============================================================================
+if not st.session_state.legal_accepted:
+    st.markdown('<div class="legal-disclaimer">', unsafe_allow_html=True)
+    
+    st.markdown('<div class="legal-title">⚖️ LEGAL DISCLAIMER & TERMS OF USE</div>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="legal-highlight">', unsafe_allow_html=True)
+    st.markdown("""
+    **🚨 IMPORTANT: YOU MUST READ AND ACCEPT THESE TERMS BEFORE USING THIS APPLICATION 🚨**
+    
+    By clicking "I Accept" below, you acknowledge that you have read, understood, and agree to be bound by all terms and conditions set forth in this disclaimer.
+    """)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="legal-section">', unsafe_allow_html=True)
+    
+    # Educational Purpose Only
+    st.markdown("### 1. 📚 EDUCATIONAL PURPOSES ONLY")
+    st.markdown("""
+    This application is provided **strictly for educational and informational purposes only**. It is designed to:
+    - Demonstrate financial modeling concepts
+    - Illustrate options and futures pricing theories
+    - Showcase machine learning applications in finance
+    - Provide learning opportunities for understanding financial markets
+    
+    **This is NOT a financial advisory service, investment recommendation platform, or trading tool for actual investment decisions.**
+    """)
+    
+    # Not Financial Advice
+    st.markdown("### 2. 🚫 NOT FINANCIAL ADVICE")
+    st.markdown("""
+    **NOTHING in this application constitutes financial, investment, tax, or legal advice.**
+    
+    The information, analysis, recommendations, and predictions provided:
+    - Are for educational demonstration purposes only
+    - Should NOT be construed as professional investment advice
+    - Should NOT be relied upon for making actual trading decisions
+    - Do NOT take into account your specific financial situation, goals, or risk tolerance
+    
+    **Always consult with a licensed financial advisor, investment professional, or tax advisor before making any investment decisions.**
+    """)
+    
+    # No Guarantee of Accuracy
+    st.markdown("### 3. ⚠️ NO GUARANTEE OF ACCURACY")
+    st.markdown("""
+    While we strive to provide accurate information, we make **NO WARRANTIES OR GUARANTEES** regarding:
+    - The accuracy, completeness, or timeliness of data displayed
+    - The correctness of pricing models, calculations, or predictions
+    - The reliability of third-party data sources (including market data APIs)
+    - The performance of machine learning models or AI recommendations
+    
+    **Data may be delayed, inaccurate, or incomplete. Models may contain errors or produce incorrect results.**
+    
+    All calculations are theoretical approximations based on mathematical models that may not reflect actual market conditions.
+    """)
+    
+    # Risk of Loss
+    st.markdown("### 4. 💸 SUBSTANTIAL RISK OF LOSS")
+    st.markdown("""
+    **TRADING OPTIONS, FUTURES, AND OTHER FINANCIAL INSTRUMENTS INVOLVES SUBSTANTIAL RISK OF LOSS.**
+    
+    You acknowledge and agree that:
+    - You can lose MORE than your initial investment in futures and options trading
+    - Options can expire worthless, resulting in 100% loss of premium paid
+    - Futures trading involves leverage and unlimited loss potential
+    - Past performance is NOT indicative of future results
+    - Simulated or hypothetical performance results have inherent limitations
+    
+    **Only trade with capital you can afford to lose completely.**
+    """)
+    
+    # No Liability
+    st.markdown("### 5. 🛡️ LIMITATION OF LIABILITY")
+    st.markdown("""
+    **TO THE MAXIMUM EXTENT PERMITTED BY LAW:**
+    
+    The creator, developer, and operator of this application ("Provider") shall **NOT be liable** for:
+    - Any trading losses, investment losses, or financial damages of any kind
+    - Any decisions made based on information, analysis, or recommendations from this application
+    - Any errors, omissions, interruptions, delays, or inaccuracies in data or functionality
+    - Any technical failures, bugs, or malfunctions of the application
+    - Any damages arising from use or inability to use this application
+    
+    **You use this application entirely at your own risk.**
+    
+    The Provider makes no representations or warranties of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.
+    """)
+    
+    # User Responsibility
+    st.markdown("### 6. 👤 USER RESPONSIBILITIES")
+    st.markdown("""
+    By using this application, you agree that:
+    - You are solely responsible for all investment and trading decisions you make
+    - You will conduct your own independent research and due diligence
+    - You will seek professional advice before making any financial decisions
+    - You understand the risks involved in options and futures trading
+    - You will comply with all applicable laws and regulations in your jurisdiction
+    - You are of legal age and have the legal capacity to use this application
+    """)
+    
+    # Compliance and Regulations
+    st.markdown("### 7. 📜 SECURITIES LAW AND REGULATORY COMPLIANCE")
+    st.markdown("""
+    This application and its provider are **NOT**:
+    - A registered investment advisor (RIA)
+    - A registered broker-dealer
+    - A member of FINRA, SEC, CFTC, or any regulatory organization
+    - Authorized to provide investment advice or execute trades
+    
+    This application does **NOT**:
+    - Offer personalized investment recommendations
+    - Execute trades on your behalf
+    - Manage investment accounts
+    - Provide fiduciary services
+    
+    **Users are responsible for ensuring their use complies with all applicable securities laws and regulations in their jurisdiction.**
+    """)
+    
+    # Hypothetical Performance
+    st.markdown("### 8. 📊 HYPOTHETICAL AND SIMULATED RESULTS")
+    st.markdown("""
+    Any performance results shown, including Monte Carlo simulations, machine learning predictions, and AI recommendations are:
+    - **Hypothetical** and based on mathematical models
+    - **NOT actual trading results** from real accounts
+    - Subject to significant limitations and assumptions
+    
+    **Hypothetical results have many inherent limitations**, including:
+    - They do not reflect actual trading, liquidity constraints, or market impact
+    - They may not account for slippage, commissions, and fees
+    - They are designed with benefit of hindsight
+    - They assume perfect execution at displayed prices
+    - Past hypothetical performance is not indicative of future results
+    """)
+    
+    # Data Sources
+    st.markdown("### 9. 🔌 THIRD-PARTY DATA SOURCES")
+    st.markdown("""
+    This application relies on third-party data sources (including but not limited to Yahoo Finance API). 
+    
+    The Provider:
+    - Does NOT control or guarantee the accuracy of third-party data
+    - Is NOT responsible for data delays, outages, or errors from third-party sources
+    - May experience interruptions in data availability at any time
+    - Does NOT warrant that data feeds will be uninterrupted or error-free
+    
+    **Always verify data with official sources before making any decisions.**
+    """)
+    
+    # Changes to Terms
+    st.markdown("### 10. 🔄 CHANGES TO TERMS")
+    st.markdown("""
+    The Provider reserves the right to modify, update, or discontinue this application or these terms at any time without notice.
+    
+    Continued use of the application after any changes constitutes acceptance of the modified terms.
+    """)
+    
+    # Geographic Restrictions
+    st.markdown("### 11. 🌍 GEOGRAPHIC RESTRICTIONS")
+    st.markdown("""
+    This application may not be available or suitable for use in all jurisdictions. Users are responsible for ensuring their use complies with local laws.
+    
+    If you are located in a jurisdiction where use of this application would be illegal or unauthorized, you must immediately cease using it.
+    """)
+    
+    # Final Warning
+    st.markdown('<div class="legal-highlight">', unsafe_allow_html=True)
+    st.markdown("""
+    ### ⚠️ FINAL WARNING ⚠️
+    
+    **IF YOU DO NOT AGREE WITH ANY OF THESE TERMS, DO NOT USE THIS APPLICATION.**
+    
+    **IF YOU CHOOSE TO USE THIS APPLICATION AFTER READING THESE TERMS, YOU DO SO AT YOUR OWN RISK AND ACCEPT FULL RESPONSIBILITY FOR ANY CONSEQUENCES.**
+    
+    **Options and futures trading is not suitable for everyone. You should carefully consider whether trading is appropriate for your financial situation.**
+    """)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Acceptance checkbox and button
+    st.markdown("---")
+    st.markdown("### ✅ ACCEPTANCE REQUIRED")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        acceptance_checkbox = st.checkbox(
+            "I have read, understood, and agree to all terms and conditions above. I acknowledge that this is for educational purposes only and not financial advice. I accept all risks and responsibilities.",
+            key="acceptance_checkbox"
+        )
+        
+        st.markdown("")  # Spacing
+        
+        if acceptance_checkbox:
+            if st.button("✅ I ACCEPT - Enter Application", type="primary", use_container_width=True):
+                st.session_state.legal_accepted = True
+                st.rerun()
+        else:
+            st.button("✅ I ACCEPT - Enter Application", type="primary", disabled=True, use_container_width=True)
+            st.info("👆 Please check the box above to confirm you have read and agree to the terms.")
+        
+        st.markdown("")  # Spacing
+        
+        if st.button("❌ I DO NOT ACCEPT - Exit", type="secondary", use_container_width=True):
+            st.error("You must accept the terms to use this application. Please close this browser tab.")
+            st.stop()
+    
+    # Stop rendering the rest of the app until accepted
+    st.stop()
+
+# ============================================================================
+# END LEGAL DISCLAIMER
+# ============================================================================
 
 # Sidebar - Inputs Section
 st.sidebar.markdown("## 📊 Inputs Section")
