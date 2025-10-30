@@ -208,7 +208,7 @@ if not st.session_state.legal_accepted:
     # Compliance and Regulations
     st.markdown("### 7. 📜 SECURITIES LAW AND REGULATORY COMPLIANCE")
     st.markdown("""
-    This application and its provider are **NOT**:
+    This application is **NOT**:
     - A registered investment advisor (RIA)
     - A registered broker-dealer
     - A member of FINRA, SEC, CFTC, or any regulatory organization
