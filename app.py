@@ -15,6 +15,9 @@ from options_pricing import OptionsPricing
 from predictive_models import PredictiveModels
 from ai_recommendations import AIRecommendations
 from futures_recommendations import FuturesRecommendations
+from database import DisclaimerDatabase
+from user_tracking import UserDataCollector
+from privacy_policy import PRIVACY_POLICY_HTML, PRIVACY_POLICY_VERSION
 
 # Page configuration
 st.set_page_config(
@@ -27,6 +30,16 @@ st.set_page_config(
 # Initialize session state for legal acceptance
 if 'legal_accepted' not in st.session_state:
     st.session_state.legal_accepted = False
+
+# Initialize database
+try:
+    db = DisclaimerDatabase()
+except Exception as e:
+    st.error(f"Database initialization error: {e}")
+    db = None
+
+# Inject browser detection script
+UserDataCollector.inject_browser_detection_script()
 
 # Custom CSS
 st.markdown("""
@@ -269,6 +282,46 @@ if not st.session_state.legal_accepted:
     If you are located in a jurisdiction where use of this application would be illegal or unauthorized, you must immediately cease using it.
     """)
     
+    # Data Collection and Privacy
+    st.markdown("### 12. DATA COLLECTION AND PRIVACY")
+    st.markdown("""
+    **WE COLLECT LIMITED PERSONAL INFORMATION FOR LEGAL COMPLIANCE AND ANALYTICS PURPOSES.**
+    
+    When you accept these terms, we automatically collect:
+    - **Session ID**: A unique identifier for your session
+    - **Timestamp**: Date and time of acceptance
+    - **IP Address**: Your internet protocol address
+    - **Geographic Location**: Approximate location based on IP (city, region, country)
+    - **Browser Information**: Browser type and version
+    - **Device Information**: Device type (desktop, mobile, tablet)
+    - **Terms Version**: Which version of terms you accepted
+    
+    **Purpose of Collection:**
+    - Legal compliance and audit trail
+    - Security and fraud prevention
+    - Analytics and improvement (with your consent)
+    
+    **Your Privacy Rights:**
+    - **Access**: Request a copy of your data
+    - **Deletion**: Request deletion of your data
+    - **Portability**: Export your data in machine-readable format
+    - **Opt-Out**: Opt-out of analytics tracking
+    
+    **GDPR & CCPA Compliance:**
+    - This application complies with GDPR (EU) and CCPA (California) regulations
+    - We do NOT sell your personal information
+    - We retain data for 3 years for legal compliance
+    - You may exercise your data rights at any time
+    
+    **Full Privacy Policy:**
+    A detailed Privacy Policy is available below and in the application footer. Please review it carefully.
+    
+    **Data Security:**
+    - Your data is stored securely in an encrypted database
+    - We implement industry-standard security measures
+    - However, no method of transmission is 100% secure
+    """)
+    
     # Final Warning
     st.markdown('<div class="legal-highlight">', unsafe_allow_html=True)
     st.markdown("""
@@ -285,6 +338,13 @@ if not st.session_state.legal_accepted:
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
+    # Privacy Policy Display
+    st.markdown("---")
+    st.markdown("### PRIVACY POLICY")
+    with st.expander("📋 Click to Read Full Privacy Policy (REQUIRED)"):
+        st.markdown(PRIVACY_POLICY_HTML)
+        st.info(f"**Privacy Policy Version:** {PRIVACY_POLICY_VERSION} | **Effective Date:** October 30, 2025")
+    
     # Acceptance checkbox and button
     st.markdown("---")
     st.markdown("### ACCEPTANCE REQUIRED")
@@ -292,17 +352,51 @@ if not st.session_state.legal_accepted:
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
+        # Terms acceptance checkbox
         acceptance_checkbox = st.checkbox(
-            "I have read, understood, and agree to all terms and conditions above. I acknowledge that this is for educational purposes only and NOT financial advice. I accept all risks and responsibilities.",
+            "I have read, understood, and agree to all terms and conditions above, including the Privacy Policy. I acknowledge that this is for educational purposes only and NOT financial advice. I accept all risks and responsibilities.",
             key="acceptance_checkbox"
+        )
+        
+        st.markdown("")  # Spacing
+        
+        # Data collection consent
+        st.markdown("**Data Collection Consent:**")
+        st.info("""
+        By accepting, you consent to the collection of: Session ID, Timestamp, IP Address, 
+        Geographic Location, Browser/Device Information, and Terms Version for legal compliance 
+        and audit purposes (required).
+        """)
+        
+        # Optional analytics consent
+        analytics_consent = st.checkbox(
+            "I consent to analytics tracking to help improve this application (OPTIONAL)",
+            key="analytics_consent",
+            value=False
         )
         
         st.markdown("")  # Spacing
         
         if acceptance_checkbox:
             if st.button("I ACCEPT - Enter Application", type="primary", use_container_width=True):
-                st.session_state.legal_accepted = True
-                st.rerun()
+                # Collect user data
+                try:
+                    user_data = UserDataCollector.collect_all_data()
+                    user_data['consent_analytics'] = analytics_consent
+                    
+                    # Store in database
+                    if db:
+                        db.record_acceptance(**user_data)
+                        st.success("Your acceptance has been recorded.")
+                    
+                    st.session_state.legal_accepted = True
+                    st.session_state.analytics_consent = analytics_consent
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error recording acceptance: {e}")
+                    # Still allow access even if database fails
+                    st.session_state.legal_accepted = True
+                    st.rerun()
         else:
             st.button("I ACCEPT - Enter Application", type="primary", disabled=True, use_container_width=True)
             st.info("Please check the box above to confirm you have read and agree to the terms.")
@@ -2106,10 +2200,137 @@ else:
 
 # Footer
 st.markdown("---")
+
+# Data Rights Section (GDPR/CCPA Compliance)
+st.markdown("### 🔒 Your Privacy & Data Rights")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("#### 📋 View Privacy Policy")
+    if st.button("View Full Privacy Policy", use_container_width=True):
+        st.session_state.show_privacy_modal = True
+
+with col2:
+    st.markdown("#### 📊 Your Data Rights")
+    with st.expander("Exercise Your Rights (GDPR/CCPA)"):
+        st.markdown("""
+        **You have the right to:**
+        - **Access** your personal data
+        - **Delete** your personal data
+        - **Export** your data (portability)
+        - **Opt-out** of analytics tracking
+        
+        Use the form below to submit a request.
+        """)
+        
+        request_type = st.selectbox(
+            "Select Request Type",
+            ["Access My Data", "Delete My Data", "Export My Data", "Opt-Out of Analytics"]
+        )
+        
+        session_id_input = st.text_input(
+            "Your Session ID",
+            value=st.session_state.get('user_session_id', ''),
+            help="Your session ID is shown in your browser session"
+        )
+        
+        additional_info = st.text_area(
+            "Additional Information (Optional)",
+            placeholder="Provide any additional details about your request..."
+        )
+        
+        if st.button("Submit Data Rights Request", use_container_width=True):
+            if session_id_input:
+                try:
+                    if request_type == "Access My Data":
+                        if db:
+                            data = db.get_user_data(session_id_input)
+                            if data:
+                                st.success(f"Found {len(data)} record(s) for your session.")
+                                st.json(data)
+                                db.log_data_request(session_id_input, "access", additional_info)
+                            else:
+                                st.warning("No data found for this session ID.")
+                    
+                    elif request_type == "Delete My Data":
+                        if db:
+                            deleted = db.delete_user_data(session_id_input)
+                            st.success(f"Successfully deleted {deleted} record(s).")
+                            st.info("Your data has been permanently removed from our database.")
+                    
+                    elif request_type == "Export My Data":
+                        if db:
+                            json_data = db.export_user_data_json(session_id_input)
+                            st.success("Data exported successfully!")
+                            st.download_button(
+                                label="Download My Data (JSON)",
+                                data=json_data,
+                                file_name=f"my_data_{session_id_input}.json",
+                                mime="application/json"
+                            )
+                            db.log_data_request(session_id_input, "export", additional_info)
+                    
+                    elif request_type == "Opt-Out of Analytics":
+                        st.session_state.analytics_consent = False
+                        if db:
+                            db.log_data_request(session_id_input, "opt-out", additional_info)
+                        st.success("You have been opted out of analytics tracking.")
+                
+                except Exception as e:
+                    st.error(f"Error processing request: {e}")
+            else:
+                st.error("Please enter your Session ID.")
+
+with col3:
+    st.markdown("#### ℹ️ Your Session Info")
+    st.info(f"""
+    **Session ID:** `{st.session_state.get('user_session_id', 'Not available')}`
+    
+    **Analytics Consent:** {'✅ Yes' if st.session_state.get('analytics_consent', False) else '❌ No'}
+    
+    Save your Session ID to exercise your data rights later.
+    """)
+
+# Privacy Policy Modal
+if st.session_state.get('show_privacy_modal', False):
+    with st.expander("📋 FULL PRIVACY POLICY", expanded=True):
+        st.markdown(PRIVACY_POLICY_HTML)
+        if st.button("Close Privacy Policy"):
+            st.session_state.show_privacy_modal = False
+            st.rerun()
+
+st.markdown("---")
+
+# Database Statistics (Anonymized)
+if st.session_state.get('analytics_consent', False):
+    with st.expander("📊 Anonymized Usage Statistics"):
+        try:
+            if db:
+                stats = db.get_statistics()
+                st.markdown("### Application Usage Statistics (Anonymized)")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total Acceptances", stats.get('total_acceptances', 0))
+                    st.metric("Analytics Consent Rate", f"{stats.get('analytics_consent_rate', 0):.1%}")
+                
+                with col2:
+                    if stats.get('by_country'):
+                        st.markdown("**Top Countries:**")
+                        for country, count in list(stats['by_country'].items())[:5]:
+                            st.text(f"{country}: {count}")
+        except Exception as e:
+            st.error(f"Error loading statistics: {e}")
+
+st.markdown("---")
+
+# Standard Footer
 st.markdown("""
 <div style='text-align: center; color: gray;'>
     <p>American Options & Futures Strategy Analyzer | Built with Streamlit</p>
     <p>⚠️ For educational purposes only. Not financial advice.</p>
+    <p style='font-size: 0.8em;'>GDPR & CCPA Compliant | Privacy Policy v1.0 | Terms v1.0</p>
 </div>
 """, unsafe_allow_html=True)
 
