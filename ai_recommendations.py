@@ -93,6 +93,109 @@ class AIRecommendations:
         return num_contracts
     
     @staticmethod
+    def analyze_ml_predictions(current_price, strike, option_type, ml_predictions, action):
+        """
+        Analyze ML predictions (SVM) to enhance recommendations
+        Returns: (ml_score, ml_insights, confidence_adjustment)
+        """
+        ml_score = 50  # Neutral baseline
+        insights = []
+        confidence_adjustment = 0
+        
+        if not ml_predictions or 'svm' not in ml_predictions:
+            return {
+                'ml_score': 50,
+                'insights': ['No ML predictions available'],
+                'confidence_adjustment': 0
+            }
+        
+        svm_prediction = ml_predictions.get('svm', current_price)
+        predicted_change = ((svm_prediction - current_price) / current_price) * 100
+        
+        # Determine if prediction supports the action
+        if option_type == 'CALL':
+            if 'BUY' in action:
+                # Buying calls - want bullish prediction
+                if predicted_change > 5:
+                    ml_score += 30
+                    insights.append(f"✅ SVM predicts +{predicted_change:.1f}% move - Supports CALL buying")
+                    confidence_adjustment += 0.15
+                elif predicted_change > 2:
+                    ml_score += 15
+                    insights.append(f"✅ SVM predicts +{predicted_change:.1f}% move - Modest bullish signal")
+                    confidence_adjustment += 0.08
+                elif predicted_change < -2:
+                    ml_score -= 20
+                    insights.append(f"⚠️ SVM predicts {predicted_change:.1f}% move - Contradicts CALL buying")
+                    confidence_adjustment -= 0.15
+                else:
+                    insights.append(f"ℹ️ SVM predicts {predicted_change:.1f}% move - Neutral signal")
+            else:  # SELL CALL
+                # Selling calls - want bearish or flat prediction
+                if predicted_change < -2:
+                    ml_score += 20
+                    insights.append(f"✅ SVM predicts {predicted_change:.1f}% move - Supports CALL selling")
+                    confidence_adjustment += 0.10
+                elif predicted_change > 5:
+                    ml_score -= 20
+                    insights.append(f"⚠️ SVM predicts +{predicted_change:.1f}% move - Contradicts CALL selling")
+                    confidence_adjustment -= 0.10
+                    
+        else:  # PUT option
+            if 'BUY' in action:
+                # Buying puts - want bearish prediction
+                if predicted_change < -5:
+                    ml_score += 30
+                    insights.append(f"✅ SVM predicts {predicted_change:.1f}% move - Supports PUT buying")
+                    confidence_adjustment += 0.15
+                elif predicted_change < -2:
+                    ml_score += 15
+                    insights.append(f"✅ SVM predicts {predicted_change:.1f}% move - Modest bearish signal")
+                    confidence_adjustment += 0.08
+                elif predicted_change > 2:
+                    ml_score -= 20
+                    insights.append(f"⚠️ SVM predicts +{predicted_change:.1f}% move - Contradicts PUT buying")
+                    confidence_adjustment -= 0.15
+                else:
+                    insights.append(f"ℹ️ SVM predicts {predicted_change:.1f}% move - Neutral signal")
+            else:  # SELL PUT
+                # Selling puts - want bullish or flat prediction
+                if predicted_change > 2:
+                    ml_score += 20
+                    insights.append(f"✅ SVM predicts +{predicted_change:.1f}% move - Supports PUT selling")
+                    confidence_adjustment += 0.10
+                elif predicted_change < -5:
+                    ml_score -= 20
+                    insights.append(f"⚠️ SVM predicts {predicted_change:.1f}% move - Contradicts PUT selling")
+                    confidence_adjustment -= 0.10
+        
+        # Strike distance analysis with ML prediction
+        strike_distance = ((strike - current_price) / current_price) * 100
+        predicted_strike_relation = ((strike - svm_prediction) / svm_prediction) * 100
+        
+        if option_type == 'CALL' and 'BUY' in action:
+            if svm_prediction > strike:
+                ml_score += 10
+                insights.append(f"✅ SVM predicts price (${svm_prediction:.2f}) above strike - ITM likely")
+                confidence_adjustment += 0.05
+        elif option_type == 'PUT' and 'BUY' in action:
+            if svm_prediction < strike:
+                ml_score += 10
+                insights.append(f"✅ SVM predicts price (${svm_prediction:.2f}) below strike - ITM likely")
+                confidence_adjustment += 0.05
+        
+        # Normalize score
+        ml_score = max(0, min(100, ml_score))
+        
+        return {
+            'ml_score': ml_score,
+            'insights': insights,
+            'confidence_adjustment': confidence_adjustment,
+            'predicted_price': svm_prediction,
+            'predicted_change_pct': predicted_change
+        }
+    
+    @staticmethod
     def analyze_greeks_for_recommendation(greeks, action, days_to_expiration, volatility):
         """
         Analyze Greeks to provide trading insights and adjust confidence
@@ -445,6 +548,29 @@ class AIRecommendations:
                     elif confidence == 'MEDIUM':
                         confidence = 'LOW'
             
+            # Analyze ML predictions (SVM)
+            ml_analysis = AIRecommendations.analyze_ml_predictions(
+                current_price, strike, 'CALL', ml_predictions, action
+            )
+            
+            # Adjust based on ML predictions
+            if action != 'HOLD':
+                # Factor ML score into risk-adjusted return
+                ml_multiplier = ml_analysis['ml_score'] / 100
+                risk_adjusted_return = risk_adjusted_return * ml_multiplier
+                
+                # Adjust confidence level based on ML predictions
+                if ml_analysis['confidence_adjustment'] > 0.10:
+                    if confidence == 'MEDIUM':
+                        confidence = 'HIGH'
+                    elif confidence == 'LOW':
+                        confidence = 'MEDIUM'
+                elif ml_analysis['confidence_adjustment'] < -0.10:
+                    if confidence == 'HIGH':
+                        confidence = 'MEDIUM'
+                    elif confidence == 'MEDIUM':
+                        confidence = 'LOW'
+            
             # Add liquidity check
             if call_volume < 10 or call_oi < 50:
                 confidence = 'LOW'
@@ -505,7 +631,12 @@ class AIRecommendations:
                 'vega': call_greeks['vega'],
                 'rho': call_greeks['rho'],
                 'greeks_score': greeks_analysis['greeks_score'],
-                'greeks_insights': ' | '.join(greeks_analysis['insights'])
+                'greeks_insights': ' | '.join(greeks_analysis['insights']),
+                # ML Predictions (SVM)
+                'ml_score': ml_analysis['ml_score'],
+                'ml_insights': ' | '.join(ml_analysis['insights']),
+                'svm_predicted_price': ml_analysis.get('predicted_price', current_price),
+                'svm_predicted_change': ml_analysis.get('predicted_change_pct', 0)
             })
         
         # Analyze puts
@@ -587,6 +718,29 @@ class AIRecommendations:
                     elif confidence == 'MEDIUM':
                         confidence = 'LOW'
             
+            # Analyze ML predictions (SVM)
+            ml_analysis = AIRecommendations.analyze_ml_predictions(
+                current_price, strike, 'PUT', ml_predictions, action
+            )
+            
+            # Adjust based on ML predictions
+            if action != 'HOLD':
+                # Factor ML score into risk-adjusted return
+                ml_multiplier = ml_analysis['ml_score'] / 100
+                risk_adjusted_return = risk_adjusted_return * ml_multiplier
+                
+                # Adjust confidence level based on ML predictions
+                if ml_analysis['confidence_adjustment'] > 0.10:
+                    if confidence == 'MEDIUM':
+                        confidence = 'HIGH'
+                    elif confidence == 'LOW':
+                        confidence = 'MEDIUM'
+                elif ml_analysis['confidence_adjustment'] < -0.10:
+                    if confidence == 'HIGH':
+                        confidence = 'MEDIUM'
+                    elif confidence == 'MEDIUM':
+                        confidence = 'LOW'
+            
             # Add liquidity check
             if put_volume < 10 or put_oi < 50:
                 confidence = 'LOW'
@@ -647,7 +801,12 @@ class AIRecommendations:
                 'vega': put_greeks['vega'],
                 'rho': put_greeks['rho'],
                 'greeks_score': greeks_analysis['greeks_score'],
-                'greeks_insights': ' | '.join(greeks_analysis['insights'])
+                'greeks_insights': ' | '.join(greeks_analysis['insights']),
+                # ML Predictions (SVM)
+                'ml_score': ml_analysis['ml_score'],
+                'ml_insights': ' | '.join(ml_analysis['insights']),
+                'svm_predicted_price': ml_analysis.get('predicted_price', current_price),
+                'svm_predicted_change': ml_analysis.get('predicted_change_pct', 0)
             })
         
         # Sort by risk-adjusted return

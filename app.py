@@ -308,142 +308,14 @@ if st.session_state.data_loaded:
                         use_container_width=True
                     )
                 
-                # Greeks Visualization
-                st.markdown("### 📈 Greeks Visualization")
-                
-                tab1, tab2, tab3 = st.tabs(["Delta & Gamma", "Theta & Vega", "Rho"])
-                
-                with tab1:
-                    fig1 = go.Figure()
-                    
-                    # Delta for calls
-                    calls_greeks_df = greeks_df[greeks_df['Type'] == 'CALL']
-                    fig1.add_trace(go.Scatter(
-                        x=calls_greeks_df['Strike'],
-                        y=calls_greeks_df['Delta'],
-                        name='Call Delta',
-                        mode='lines+markers',
-                        line=dict(color='green', width=2),
-                        marker=dict(size=8)
-                    ))
-                    
-                    # Delta for puts
-                    puts_greeks_df = greeks_df[greeks_df['Type'] == 'PUT']
-                    fig1.add_trace(go.Scatter(
-                        x=puts_greeks_df['Strike'],
-                        y=puts_greeks_df['Delta'],
-                        name='Put Delta',
-                        mode='lines+markers',
-                        line=dict(color='red', width=2),
-                        marker=dict(size=8)
-                    ))
-                    
-                    # Gamma for both (overlaid)
-                    fig1.add_trace(go.Scatter(
-                        x=calls_greeks_df['Strike'],
-                        y=calls_greeks_df['Gamma'],
-                        name='Gamma',
-                        mode='lines+markers',
-                        line=dict(color='blue', width=2, dash='dash'),
-                        marker=dict(size=6),
-                        yaxis='y2'
-                    ))
-                    
-                    # Add current price line
-                    fig1.add_vline(x=current_price, line_dash="dash", line_color="gray",
-                                  annotation_text=f"Current: ${current_price:.2f}")
-                    
-                    fig1.update_layout(
-                        title='Delta and Gamma by Strike',
-                        xaxis_title='Strike Price',
-                        yaxis_title='Delta',
-                        yaxis2=dict(title='Gamma', overlaying='y', side='right'),
-                        hovermode='x unified',
-                        height=400
-                    )
-                    
-                    st.plotly_chart(fig1, use_container_width=True)
-                
-                with tab2:
-                    fig2 = go.Figure()
-                    
-                    # Theta
-                    fig2.add_trace(go.Scatter(
-                        x=calls_greeks_df['Strike'],
-                        y=calls_greeks_df['Theta'],
-                        name='Call Theta',
-                        mode='lines+markers',
-                        line=dict(color='purple', width=2)
-                    ))
-                    
-                    fig2.add_trace(go.Scatter(
-                        x=puts_greeks_df['Strike'],
-                        y=puts_greeks_df['Theta'],
-                        name='Put Theta',
-                        mode='lines+markers',
-                        line=dict(color='orange', width=2)
-                    ))
-                    
-                    # Vega (same for calls and puts)
-                    fig2.add_trace(go.Scatter(
-                        x=calls_greeks_df['Strike'],
-                        y=calls_greeks_df['Vega'],
-                        name='Vega',
-                        mode='lines+markers',
-                        line=dict(color='cyan', width=2, dash='dash'),
-                        yaxis='y2'
-                    ))
-                    
-                    fig2.add_vline(x=current_price, line_dash="dash", line_color="gray",
-                                  annotation_text=f"Current: ${current_price:.2f}")
-                    
-                    fig2.update_layout(
-                        title='Theta and Vega by Strike',
-                        xaxis_title='Strike Price',
-                        yaxis_title='Theta (Daily Decay)',
-                        yaxis2=dict(title='Vega', overlaying='y', side='right'),
-                        hovermode='x unified',
-                        height=400
-                    )
-                    
-                    st.plotly_chart(fig2, use_container_width=True)
-                
-                with tab3:
-                    fig3 = go.Figure()
-                    
-                    fig3.add_trace(go.Scatter(
-                        x=calls_greeks_df['Strike'],
-                        y=calls_greeks_df['Rho'],
-                        name='Call Rho',
-                        mode='lines+markers',
-                        line=dict(color='teal', width=2)
-                    ))
-                    
-                    fig3.add_trace(go.Scatter(
-                        x=puts_greeks_df['Strike'],
-                        y=puts_greeks_df['Rho'],
-                        name='Put Rho',
-                        mode='lines+markers',
-                        line=dict(color='brown', width=2)
-                    ))
-                    
-                    fig3.add_vline(x=current_price, line_dash="dash", line_color="gray",
-                                  annotation_text=f"Current: ${current_price:.2f}")
-                    
-                    fig3.update_layout(
-                        title='Rho by Strike (Interest Rate Sensitivity)',
-                        xaxis_title='Strike Price',
-                        yaxis_title='Rho',
-                        hovermode='x unified',
-                        height=400
-                    )
-                    
-                    st.plotly_chart(fig3, use_container_width=True)
-                
                 # Greeks Summary
                 st.markdown("### 📋 Key Greeks Insights")
                 
                 insight_col1, insight_col2, insight_col3 = st.columns(3)
+                
+                # Extract calls and puts Greeks for summary
+                calls_greeks_df = greeks_df[greeks_df['Type'] == 'CALL']
+                puts_greeks_df = greeks_df[greeks_df['Type'] == 'PUT']
                 
                 # Find ATM option (closest to current price)
                 atm_call = calls_greeks_df.iloc[(calls_greeks_df['Strike'] - current_price).abs().argsort()[:1]]
@@ -766,9 +638,10 @@ if st.session_state.data_loaded:
                 - Portfolio Value: ${portfolio_value:,.2f}
                 - Risk per Trade: {risk_percentage}% (${portfolio_value * risk_percentage / 100:,.2f})
                 - Based on {num_simulations:,} Monte Carlo simulations
-                - Incorporating ML predictions and fair value analysis
+                - **SVM Model Integration**: Price predictions with RBF kernel
                 - **Greeks-Enhanced Analysis**: Delta, Gamma, Theta, Vega, Rho
-                - Considering liquidity, time decay, and risk-adjusted returns
+                - Incorporating ML predictions, fair value, and risk-adjusted returns
+                - Considering liquidity, time decay, and market sentiment
                 """)
                 
                 for idx, row in top_recs.iterrows():
@@ -812,6 +685,16 @@ if st.session_state.data_loaded:
                     
                     # Greeks Score
                     st.progress(row['greeks_score'] / 100, text=f"Greeks Score: {row['greeks_score']:.0f}/100")
+                    
+                    # ML Score & Prediction
+                    ml_score_col1, ml_score_col2 = st.columns(2)
+                    with ml_score_col1:
+                        st.progress(row['ml_score'] / 100, text=f"SVM Model Score: {row['ml_score']:.0f}/100")
+                    with ml_score_col2:
+                        change_indicator = "📈" if row['svm_predicted_change'] > 0 else "📉"
+                        st.metric(f"{change_indicator} SVM Prediction", 
+                                 f"${row['svm_predicted_price']:.2f}", 
+                                 f"{row['svm_predicted_change']:.2f}%")
                     
                     with st.expander("📋 Trading Plan & Execution Details"):
                         # Entry Parameters
@@ -886,6 +769,35 @@ if st.session_state.data_loaded:
                                     st.info(f"ℹ {insight}")
                         
                         st.caption("**Greeks Analysis:** The AI has analyzed Delta, Gamma, Theta, Vega, and Rho to assess this trade's sensitivity to price, time, and volatility changes.")
+                        
+                        st.markdown("---")
+                        
+                        # ML Predictions (SVM)
+                        st.markdown("#### 🤖 SVM MODEL PREDICTIONS")
+                        ml_col1, ml_col2, ml_col3 = st.columns(3)
+                        
+                        with ml_col1:
+                            st.metric("ML Score", f"{row['ml_score']:.0f}/100")
+                        
+                        with ml_col2:
+                            st.metric("Predicted Price", f"${row['svm_predicted_price']:.2f}")
+                        
+                        with ml_col3:
+                            change_delta = "+" if row['svm_predicted_change'] > 0 else ""
+                            st.metric("Predicted Change", f"{change_delta}{row['svm_predicted_change']:.2f}%")
+                        
+                        # Display ML insights
+                        if row['ml_insights']:
+                            ml_insights_list = row['ml_insights'].split(' | ')
+                            for insight in ml_insights_list:
+                                if '✅' in insight or 'Supports' in insight:
+                                    st.success(f"✓ {insight}")
+                                elif '⚠️' in insight or 'Contradicts' in insight:
+                                    st.warning(f"⚠ {insight}")
+                                else:
+                                    st.info(f"ℹ {insight}")
+                        
+                        st.caption("**SVM Analysis:** Support Vector Machine with RBF kernel predicts future price movement based on historical patterns and current market conditions.")
                     
                     st.markdown("---")
                 
