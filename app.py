@@ -517,7 +517,10 @@ if st.session_state.data_loaded:
     
     if is_futures:
         st.sidebar.info("🔮 **FUTURES CONTRACT DETECTED**")
-        st.sidebar.metric("Futures Price", f"${st.session_state.current_price:.2f}")
+        if st.session_state.current_price is not None:
+            st.sidebar.metric("Futures Price", f"${st.session_state.current_price:.2f}")
+        else:
+            st.sidebar.warning("Futures price unavailable")
         
         if st.session_state.futures_info:
             st.sidebar.metric("Contract Multiplier", f"{st.session_state.futures_info['contract_multiplier']}x")
@@ -527,7 +530,10 @@ if st.session_state.data_loaded:
             st.sidebar.metric("Est. Initial Margin", f"${st.session_state.margin_info['initial_margin']:,.2f}")
             st.sidebar.metric("Est. Maint. Margin", f"${st.session_state.margin_info['maintenance_margin']:,.2f}")
     else:
-        st.sidebar.metric("Current Price", f"${st.session_state.current_price:.2f}")
+        if st.session_state.current_price is not None:
+            st.sidebar.metric("Current Price", f"${st.session_state.current_price:.2f}")
+        else:
+            st.sidebar.warning("Current price unavailable")
     
     if st.session_state.volatility:
         st.sidebar.metric("Annual Volatility (252 days)", f"{st.session_state.volatility*100:.2f}%")
